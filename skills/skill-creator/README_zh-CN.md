@@ -9,10 +9,10 @@
 1. **意图捕获与访谈引导**：引导 Agent 提取用户真实意图、设计面向任务的 Prompt 提示词，并定义具体交付指标。包含结构化的 **AskUserQuestion 提问协议**，减少用户认知过载。
 2. **前置调研机制 (Prior Art Research)**：整合 **8 渠道搜索优先级协议** 和 **Adopt / Extend / Build 决策矩阵**，帮助 Agent 科学判断是否可以直接复用现有 MCP 或开源工具。
 3. **Wrapper 技能专用工作流**：为包装已有的第三方 CLI 二进制工具（例如 `yt-dlp`）提供专属的回溯性提炼工作流，包括故障自愈和打包规范。
-4. **迭代评估**：自动运行对比测试（使用技能 vs 基础基线），以定性和定量的方式全面评估技能改动。
-5. **人机协同评审**：生成基于 Web 或静态网页的评审看板（`generate_review.py`），直观对比输出数据、断言通过率和时间开销。
+4. **迭代评估**：自动运行对比测试（使用技能 vs 基础基线），以定性和定量的方式全面评估技能改动。支持**多层级触发评估降级机制**（Claude CLI -> OpenAI兼容API -> 本地关键字启发式匹配），以便在无状态/嵌套环境中无缝执行。
+5. **人机协同评审**：生成基于 Web 或静态网页的评审看板（`generate_review.py`），直观对比输出数据、断言通过率和时间开销。全局强制使用 UTF-8 编码，消除 Windows 平台兼容性隐患。
 6. **触发描述优化**：通过自动反馈闭环（`run_loop.py`）对 SKILL.md 中的描述进行多轮演进，有效解决 Agent 的“漏触发”痛点。
-7. **设计规范静态 Lint**：在技能打包前，对环境检查规范、内存管理以及输出指引模式进行静态分析校验。
+7. **设计规范静态 Lint**：在技能打包前，对环境检查规范、内存管理以及输出指引模式进行静态分析校验。集成**微软商店 Python 解释器桩检测（Microsoft Store Python stub detection）**，防止执行静默失败。
 8. **自动化安全审计**：集成 `gitleaks` 和安全审查脚本（`security_scan.py`）进行打包前的硬门禁式隐私与漏洞扫描。
 
 ---
@@ -117,8 +117,9 @@ python scripts/package_skill.py <技能目录路径> [--dry-run]
 
 | 版本号 | 关键改进与里程碑 | 对应提交哈希 (Commit Hash) |
 | :--- | :--- | :--- |
-| **v2.2.0** (当前) | 合并 Daymade 深度分支：整合 AskUserQuestion 提问协议、前置调研 Adopt/Extend/Build 矩阵、Wrapper 技能工作流、自动化安全审计（`security_scan.py`）以及依赖检测。 | `ed102c7` |
-| **v2.1.0** | 落实 Phase 2.1 细节微调（实现 learnings.md 自动加载、内嵌精简算子警告提示、新增 `claude` CLI 状态自检及网络探针）。 | `266c4c7` |
+| **v2.3.0** (当前) | 解耦 Claude CLI 依赖，支持多层级触发评估降级（Claude CLI -> OpenAI兼容API -> 本地启发式）；新增微软商店 Python 解释器桩校验警示（`quick_validate.py`/`run_eval.py`）；放宽基准测试目录结构支持扁平结构读取（`aggregate_benchmark.py`）；全局文件读写强制使用 UTF-8 编码。 | `aa9a4ba` |
+| **v2.2.0** | 合并 Daymade 深度分支：整合 AskUserQuestion 提问协议、前置调研 Adopt/Extend/Build 矩阵、Wrapper 技能工作流、自动化安全审计（`security_scan.py`）以及依赖检测。 | `ed102c7` |
+| **v2.1.0** | 落实 Phase 2.1 细节微调（实现 learnings.md 自动加载、内嵌精简算子警告提示、新增 `claude` CLI 状态自检及 network 探针）。 | `266c4c7` |
 | **v2.0.0** | 架构重大重构（整合 Pre-flight 渐进探索机制、Agent Guidance 密度策略、Windows 平台兼容性修复如非阻塞 Stream 守护线程与 GBK/UTF-8 字符集兼容）。 | `62ea459` |
 | **v1.0.0** (历史) | 技能创建、测试与评估的基础流水线版本（优化前）。 | `b9e19e6` |
 
@@ -136,7 +137,7 @@ python scripts/package_skill.py <技能目录路径> [--dry-run]
     git checkout -b v2.0.0-initial 62ea459
     ```
 
-*   **切回当前最新最稳定的 `v2.2.0` 版本**：
+*   **切回当前最新最稳定的 `v2.3.0` 版本**：
     ```bash
     git checkout more
     ```

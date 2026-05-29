@@ -9,10 +9,10 @@
 1. **Intelligent Capture & Interview**: Guides the agent through capturing user intent, designing task-focused prompts, and defining target capabilities. Includes the structured **AskUserQuestion Protocol** to minimize cognitive load.
 2. **Prior Art Research (Adopt/Extend/Build)**: Integrates an **8-channel prioritized lookup protocol** (history, SOPs, plugins, community plugins, npm/PyPI, docs) to prevent reinventing the wheel.
 3. **Wrapper Skills Workflow**: A dedicated retrospective distillation workflow for wrapping, configuring, diagnosing, and providing self-healing flags for existing CLI tools (e.g., `yt-dlp`).
-4. **Iterative Evaluation**: Automates parallel runs (with-skill vs. baseline) to benchmark changes qualitatively and quantitatively.
-5. **Interactive Review**: Exposes a web-based/static HTML Review Viewer (`generate_review.py`) showing comparative outputs, assertion pass rates, and timing.
+4. **Iterative Evaluation**: Automates parallel runs (with-skill vs. baseline) to benchmark changes qualitatively and quantitatively. Supports **Multi-Tier Trigger Evaluation Fallback** (Claude CLI -> OpenAI-Compatible API -> local keyword Heuristic Matcher) to run seamlessly in serverless/nested environments.
+5. **Interactive Review**: Exposes a web-based/static HTML Review Viewer (`generate_review.py`) showing comparative outputs, assertion pass rates, and timing. Enforces UTF-8 file operations globally for robust cross-platform compatibility.
 6. **Trigger Optimization**: Optimizes skill metadata descriptions using an automated feedback loop (`run_loop.py`) to prevent under-triggering.
-7. **Static Design Linting**: Restricts and enforces design consistency, environment check standards, and memory management rules before compiling.
+7. **Static Design Linting**: Restricts and enforces design consistency, environment check standards, and memory management rules before compiling. Includes automatic **Microsoft Store Python interpreter stub detection** to prevent silent execution failures.
 8. **Automated Security Reviews**: Integrates gitleaks and secret scanners (`security_scan.py`) as mandatory gatekeepers before packaging.
 
 ---
@@ -117,7 +117,8 @@ python scripts/package_skill.py <path-to-skill-directory> [--dry-run]
 
 | Version | Key Changes & Milestones | Commit Hash |
 | :--- | :--- | :--- |
-| **v2.2.0** (Current) | Merged Daymade fork features: Integrated AskUserQuestion protocol, Prior Art Research decision matrix, Wrapper Skill workflows, automated security scanning (`security_scan.py`), and prerequisites verification. | `ed102c7` |
+| **v2.3.0** (Current) | Decoupled Claude CLI dependency with Multi-Tier Trigger Evaluation Fallback (Claude CLI -> OpenAI-Compatible API -> Local Heuristics) in `run_eval.py`. Added Microsoft Store Python interpreter stub warnings in `quick_validate.py`/`run_eval.py` and relaxed benchmark directory layouts to support flat configs in `aggregate_benchmark.py`. Enforced UTF-8 file operations globally. | `aa9a4ba` |
+| **v2.2.0** | Merged Daymade fork features: Integrated AskUserQuestion protocol, Prior Art Research decision matrix, Wrapper Skill workflows, automated security scanning (`security_scan.py`), and prerequisites verification. | `ed102c7` |
 | **v2.1.0** | Implemented Phase 2.1 refinements (learnings.md auto-load, compression templates, `claude` CLI state and network checks). | `266c4c7` |
 | **v2.0.0** | Major architectural overhaul: Integrated Pre-flight checks, Agent Guidance protocols, and full Windows cross-platform compatibility (async stream daemon threads, encoding fixes). | `62ea459` |
 | **v1.0.0** (Legacy) | Base setup & early script execution workflow before optimization patterns. | `b9e19e6` |
@@ -136,7 +137,7 @@ To inspect or fall back to previous major versions, run the checkout commands be
     git checkout -b v2.0.0-initial 62ea459
     ```
 
-*   **Return to the Latest Stable Version (`v2.2.0`)**:
+*   **Return to the Latest Stable Version (`v2.3.0`)**:
     ```bash
     git checkout more
     ```
