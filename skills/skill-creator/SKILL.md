@@ -40,6 +40,23 @@ So please pay attention to context cues to understand how to phrase your communi
 
 It's OK to briefly explain terms if you're in doubt, and feel free to clarify terms with a short definition if you're unsure if the user will get it.
 
+### Using AskUserQuestion (Critical — Read This)
+
+**Use the AskUserQuestion tool aggressively at every decision point.** Do not ask open-ended text questions in conversation when structured choices exist. This is the single biggest UX improvement you can make — users juggle multiple windows and may not have looked at this conversation in 20 minutes.
+
+**Every AskUserQuestion MUST follow this structure:**
+
+1. **Re-ground**: State the skill name, current phase, and what just happened (1-2 sentences). The user may have context-switched away.
+2. **Simplify**: Explain the decision in plain language. No function names or internal jargon. Say what it DOES, not what it's called.
+3. **Recommend**: Lead with your recommendation and a one-line reason why. If options involve effort, show both scales: `(human: ~X min / Claude: ~Y min)`.
+4. **Options**: Provide 2-4 concrete, lettered choices. Each option should be a clear action, not an abstract concept.
+
+**Rules:**
+- One decision per question — never batch unrelated choices
+- Provide an escape hatch ("Other" is always implicit in AskUserQuestion)
+- Accept the user's choice — nudge on tradeoffs but never refuse to proceed
+- Skip the question if there's an obvious answer with no tradeoffs (just state what you'll do)
+
 ---
 
 ## Creating a skill
@@ -59,10 +76,103 @@ Teach this same pattern to the skills you create — every skill's SKILL.md shou
 
 Start by understanding the user's intent. The current conversation might already contain a workflow the user wants to capture (e.g., they say "turn this into a skill"). If so, extract answers from the conversation history first — the tools used, the sequence of steps, corrections the user made, input/output formats observed. The user may need to fill the gaps, and should confirm before proceeding to the next step.
 
-1. What should this skill enable Claude to do?
-2. When should this skill trigger? (what user phrases/contexts)
-3. What's the expected output format?
-4. Should we set up test cases to verify the skill works? Skills with objectively verifiable outputs (file transforms, data extraction, code generation, fixed workflow steps) benefit from test cases. Skills with subjective outputs (writing style, art) often don't need them. Suggest the appropriate default based on the skill type, but let the user decide.
+After extracting answers from conversation history (or asking questions 1-3), use **AskUserQuestion** to confirm the skill type and testing strategy:
+
+```
+Creating skill "[name]" — here's what I understand so far:
+- Purpose: [1-sentence summary]
+- Triggers on: [key phrases]
+- Output: [format]
+
+RECOMMENDATION: [Objective/Subjective/Hybrid] skill → [suggested testing approach]
+
+Options:
+A) Objective output (files, code, data) — set up automated test cases (Recommended if output is verifiable)
+B) Subjective output (writing, design) — qualitative human review only
+C) Hybrid — automated checks for structure, human review for quality
+D) Skip testing for now — just build the skill and iterate by feel
+```
+
+This upfront classification drives the entire evaluation strategy downstream. Get it right here to avoid wasted effort later.
+
+### Specialized Workflow: Wrapper Skills for Third-Party CLI Tools
+
+Before committing to the generic skill-creation flow, check whether the session that led up to this point actually calls for the **wrapper skill** workflow instead. A wrapper skill is a companion that installs, configures, diagnoses, and repairs a pre-existing third-party CLI tool or skill package — code that someone else wrote and that the user has just spent a session getting to work on their machine.
+
+Signals this applies (any two together are enough):
+
+- The user has been installing a tool in the current conversation — downloading a `.zip`, running `npx` / `pip install` / `brew install`, dealing with an official installer.
+- The session has produced real, concrete error messages and the user and Claude have worked out concrete fixes for them (edited files, added flags, bypassed aliases).
+- The user says something like "wrap this up as a skill", "save this as a wrapper skill", "so other people don't have to go through this again", "把这次 session 做成一个 skill".
+- The user explicitly mentions a third-party tool by name and wants other agents or other people to be able to use it without the learning curve they just paid.
+
+Signals it does **not** apply (use the generic workflow above instead):
+
+- The user wants a skill for something they're going to write from scratch.
+- The session was smooth — no real friction to capture.
+- The skill would wrap a service the user owns or controls (it's their code; edit the source instead of wrapping it).
+- The "tool" is actually a methodology or workflow that doesn't involve installing any binary or package.
+
+When the wrapper skill workflow applies, **do not** continue reading the sections below. Jump to [`workflows/wrapper-skill/workflow.md`](workflows/wrapper-skill/workflow.md) and follow that workflow end-to-end. It is a **retrospective distillation** workflow — its job is to mine the current conversation for the install flow, the bugs that were fixed, and the design decisions that were made, and to turn that mining output into a complete, self-contained wrapper skill that another user can install and benefit from without reliving the debugging session.
+
+The wrapper skill workflow has its own architecture contract, code templates, and verification protocol — it does not share test-case infrastructure with the generic workflow, because its output is a user's install state rather than a file that can be easily asserted on. The canonical reference implementation is the `ima-copilot` skill (e.g. `<workspace>/ima-copilot` or local equivalent).
+
+### Prior Art Research (Do Not Skip)
+
+The user's private methodology — their domain rules, workflow decisions, competitive edge — is what makes a skill valuable. No public repo can provide that. But the user shouldn't waste time reinventing infrastructure (API clients, auth flows, rate limiting) when mature tools exist. Prior art research finds building blocks for the infrastructure layer so the skill can focus on encoding the user's unique methodology.
+
+**Search these channels in order** (use subagents for 4-8 in parallel):
+
+| Priority | Channel | What to search | How |
+|----------|---------|---------------|-----|
+| 1 | **Conversation history** | User's proven workflows, verified API patterns, corrections made during debugging | Grep recent conversations for the service/API name |
+| 2 | **Local documents & SOPs** | User's private methodology, runbooks, existing skills | Search project directory, `~/.claude/CLAUDE.md`, `~/.claude/references/` |
+| 3 | **Installed plugins & MCPs** | Already-integrated tools | Check `~/.claude/plugins/`, parse `installed_plugins.json`; check `~/.claude.json` for configured MCP servers |
+| 4 | **skills.sh** | Community skills | `WebFetch https://skills.sh/?q=<keyword>` |
+| 5 | **Anthropic official plugins** | Official/partner plugins | `WebFetch https://github.com/anthropics/claude-plugins-official/tree/main/plugins` and `external_plugins` directory |
+| 6 | **MCP servers on GitHub** | Existing MCP servers for the same API | `WebSearch "<service-name> MCP server site:github.com"` |
+| 7 | **Official API docs** | The target service's own documentation | `WebSearch "<service-name> API documentation"` or `WebFetch` the docs URL |
+| 8 | **npm / PyPI** | SDK or CLI packages | `npm search <keyword>` or `curl https://pypi.org/pypi/<name>/json` |
+
+Channels 1-3 surface the user's own proven patterns and existing integrations. Channels 4-8 find public infrastructure. The user's private SOP always takes precedence — public tools are building blocks, not replacements. In competitive domains (finance, trading, proprietary operations), the valuable methodology will never be public.
+
+**If a public MCP server or skill is found, clone it and verify — don't trust the README:**
+
+1. **Read the actual source code** — many projects have polished READMEs on hollow codebases
+2. **Verify auth method** — does it match how the API actually authenticates? (X-Api-Key headers vs Bearer vs OAuth — many get this wrong)
+3. **Check test coverage** — zero tests = prototype, not production-grade
+4. **Check maintenance** — last commit date, open issue count, response to bug reports
+5. **Check environment compatibility** — proxy/network assumptions, hardcoded DNS/IPs, region locks
+6. **Check license** — MIT/Apache is fine; GPL/SSPL may conflict with proprietary use
+7. **Check dependency weight** — huge dependency trees create conflict and security surface
+
+**Decision matrix:**
+
+| Finding | Action |
+|---------|--------|
+| Mature MCP/SDK handles the infrastructure | **Adopt it, build on top** — install the MCP, then build the skill as a workflow layer encoding the user's methodology |
+| Partial MCP or SDK exists | **Extend** — use for infrastructure, fill gaps in the skill |
+| Public skill covers the same domain | **Use for structural inspiration only** — public skills in competitive domains are generic by definition. The user's edge is their private SOP |
+| Nothing public exists | **Build from scratch** — validate API access patterns work (auth, endpoints, proxy) before writing the full skill |
+| Integration cost > build cost | **Build it** — a 2-hour custom implementation you own beats a "mature" tool with integration friction and upstream risk |
+
+After research completes, present findings via **AskUserQuestion**:
+
+```
+Research complete for "[skill-name]". Here's what I found:
+
+[1-2 sentence summary of what exists publicly]
+
+RECOMMENDATION: [ADOPT / EXTEND / BUILD] because [one-line reason]
+
+Options:
+A) Adopt [tool/MCP X] for infrastructure, build methodology layer on top (Recommended)
+B) Extend [partial tool Y] — use what works, fill gaps in the skill
+C) Build from scratch — nothing found matches well enough
+D) Show me the detailed findings before I decide
+```
+
+When in doubt, bias toward adopting mature infrastructure for the plumbing layer and building custom logic for the methodology layer — that's where the value lives.
 
 ### Interview and Research
 
@@ -94,6 +204,184 @@ skill-name/
     ├── references/ - Docs loaded into context as needed
     └── assets/     - Files used in output (templates, icons, fonts)
 ```
+
+#### YAML Frontmatter Reference
+
+All frontmatter fields except `description` are optional. Configure skill behavior using these fields between `---` markers:
+
+```yaml
+---
+name: my-skill
+description: What this skill does and when to use it. Use when...
+context: fork
+agent: general-purpose
+argument-hint: [topic]
+---
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | No | Display name for the skill. If omitted, uses the directory name. Lowercase letters, numbers, and hyphens only (max 64 characters). |
+| `description` | Recommended | What the skill does and when to use it. Claude uses this to decide when to apply the skill. If omitted, uses the first paragraph of markdown content. |
+| `context` | No | **Set to `fork` to run in a forked subagent context.** See "Inline vs Fork: Critical Decision" below — choosing wrong breaks your skill. |
+| `agent` | No | Which subagent type to use when `context: fork` is set. Options: `Explore`, `Plan`, `general-purpose`, or custom agents from `.claude/agents/`. Default: `general-purpose`. |
+| `disable-model-invocation` | No | Set to `true` to prevent Claude from automatically loading this skill. Use for workflows you want to trigger manually with `/name`. Default: `false`. |
+| `user-invocable` | No | Set to `false` to hide from the `/` menu. Use for background knowledge users shouldn't invoke directly. Default: `true`. |
+| `allowed-tools` | No | Pre-approved tools list. **Recommendation: Do NOT set this field.** Omitting it gives the skill full tool access governed by the user's permission settings. Setting it restricts the skill's capabilities unnecessarily. |
+| `model` | No | Model to use when this skill is active. |
+| `argument-hint` | No | Hint shown during autocomplete to indicate expected arguments. Example: `[issue-number]` or `[filename] [format]`. |
+| `hooks` | No | Hooks scoped to this skill's lifecycle. Example: `hooks: { pre-invoke: [{ command: "echo Starting" }] }`. See Claude Code Hooks documentation. |
+
+**Special placeholder:** `$ARGUMENTS` in skill content is replaced with text the user provides after the skill name. For example, `/deep-research quantum computing` replaces `$ARGUMENTS` with `quantum computing`.
+
+##### Inline vs Fork: Critical Decision
+
+**This is the most important architectural decision when designing a skill.** Choosing wrong will silently break your skill's core capabilities.
+
+**CRITICAL CONSTRAINT: Subagents cannot spawn other subagents.** A skill running with `context: fork` (as a subagent) CANNOT:
+- Use the Task tool to spawn parallel exploration agents
+- Use the Skill tool to invoke other skills
+- Orchestrate any multi-agent workflow
+
+**Decision guide:**
+
+| Your skill needs to... | Use | Why |
+|------------------------|-----|-----|
+| Orchestrate parallel agents (Task tool) | **Inline** (no `context`) | Subagents can't spawn subagents |
+| Call other skills (Skill tool) | **Inline** (no `context`) | Subagents can't invoke skills |
+| Run Bash commands for external CLIs | **Inline** (no `context`) | Full tool access in main context |
+| Perform a single focused task (research, analysis) | **Fork** (`context: fork`) | Isolated context, clean execution |
+| Provide reference knowledge (coding conventions) | **Inline** (no `context`) | Guidelines enrich main conversation |
+| Be callable BY other skills | **Fork** (`context: fork`) | Must be a subagent to be spawned |
+
+**Example: Orchestrator skill (MUST be inline):**
+```yaml
+---
+name: product-analysis
+description: Multi-path parallel product analysis with cross-model synthesis
+---
+
+# Orchestrates parallel agents — inline is REQUIRED
+1. Auto-detect available tools (which codex, etc.)
+2. Launch 3-5 Task agents in parallel (Explore subagents)
+3. Optionally invoke /competitors-analysis via Skill tool
+4. Synthesize all results
+```
+
+**Example: Specialist skill (fork is correct):**
+```yaml
+---
+name: deep-research
+description: Research a topic thoroughly using multiple sources
+context: fork
+agent: Explore
+---
+
+Research $ARGUMENTS thoroughly:
+1. Find relevant files using Glob and Grep
+2. Read and analyze the code
+3. Summarize findings with specific file references
+```
+
+**Example: Reference skill (inline, no task):**
+```yaml
+---
+name: api-conventions
+description: API design patterns for this codebase
+---
+
+When writing API endpoints:
+- Use RESTful naming conventions
+- Return consistent error formats
+```
+
+##### Composable Skill Design (Orthogonality)
+
+Skills should be **orthogonal**: each skill handles one concern, and they combine through composition.
+
+**Pattern: Orchestrator (inline) calls Specialist (fork)**
+```
+product-analysis (inline, orchestrator)
+  ├─ Task agents for parallel exploration
+  ├─ Skill('competitors-analysis', 'X') → fork subagent
+  └─ Synthesizes all results
+
+competitors-analysis (fork, specialist)
+  └─ Single focused task: analyze one competitor codebase
+```
+
+**Rules for composability:**
+1. The **caller** must be inline (no `context: fork`) to use Task/Skill tools
+2. The **callee** should use `context: fork` to run in isolated subagent context
+3. Each skill has a single responsibility — don't mix orchestration with execution
+4. Share methodology via references (e.g., checklists, templates), not by duplicating code
+
+##### Pipeline Handoff (Sequential Skill Chaining)
+
+Beyond orchestrator/specialist composition, skills often form **sequential pipelines** where one skill's output is the next skill's input. Each skill should proactively suggest the logical next step after completing its work.
+
+**Pattern: "Next Step" section at the end of SKILL.md**
+
+```markdown
+## Next Step: [Action Description]
+
+After [this skill completes], suggest the natural next skill:
+
+\```
+[Summary of what was just accomplished].
+
+Options:
+A) [Next skill] — [one-line reason] (Recommended)
+B) [Alternative skill] — [when this is better]
+C) No thanks — [the current output is sufficient]
+\```
+```
+
+**Real-world pipeline examples:**
+
+```
+youtube-downloader → asr-transcribe-to-text → transcript-fixer → meeting-minutes-taker → pdf-creator
+deep-research → fact-checker → ppt-creator
+doc-to-markdown → docs-cleaner
+claude-code-history-files-finder → continue-claude-work
+```
+
+**Rules for pipeline handoff:**
+1. Every handoff is **opt-in** via AskUserQuestion — never auto-invoke the next skill without asking
+2. Suggest only when the output naturally feeds into another skill — don't force connections
+3. Include a "No thanks" option — the user may not need the full pipeline
+4. The suggestion should explain **why** the next step helps (e.g., "ASR output typically contains recognition errors")
+5. Keep it to 1-2 recommendations max — too many choices cause decision fatigue
+
+**When to add a handoff:** Ask "does this skill's output commonly become another skill's input?" If yes, add a "Next Step" section. If the connection is rare or forced, don't add one.
+
+**Anti-pattern:** Chaining skills that don't share a natural data flow. `pdf-creator → youtube-downloader` makes no sense. The pipeline must follow the user's actual workflow.
+
+##### Auto-Detection Over Manual Flags
+
+**Never add manual flags for capabilities that can be auto-detected.** Instead of requiring users to pass `--with-codex` or `--verbose`, detect capabilities at runtime:
+
+```
+# Good: Auto-detect and inform
+Step 0: Check available tools
+  - `which codex` → If found, inform user and enable cross-model analysis
+  - `ls package.json` → If found, tailor prompts for Node.js project
+  - `which docker` → If found, enable container-based execution
+
+# Bad: Manual flags
+argument-hint: [scope] [--with-codex] [--docker] [--verbose]
+```
+
+**Principle:** Capabilities auto-detect, user decides scope. A skill should discover what it CAN do and act accordingly, not require users to remember what tools are installed.
+
+##### Invocation Control
+
+| Frontmatter | You can invoke | Claude can invoke | Subagents can use |
+|-------------|----------------|-------------------|-------------------|
+| (default) | Yes | Yes | No (runs inline) |
+| `context: fork` | Yes | Yes | Yes |
+| `disable-model-invocation: true` | Yes | No | No |
+| `context: fork` + `disable-model-invocation: true` | Yes | No | Yes (when explicitly delegated) |
 
 #### Cross-Session Memory (learnings.md)
 
@@ -515,6 +803,215 @@ If you're in Cowork, the main things to know are:
 
 ---
 
+## Skill Creation Process (Step-by-Step)
+
+When creating or updating a skill, follow these steps in order. Skip steps only when clearly not applicable.
+
+### Step 0: Prerequisites Check
+
+Before starting any skill work, auto-detect all dependencies and proactively install anything missing. Discovering a missing tool mid-workflow (e.g., gitleaks at packaging time, PyYAML at validation) wastes time and breaks flow.
+
+Run the quick check from [references/prerequisites.md](references/prerequisites.md), auto-install what you can, and present the user a summary checklist. Only proceed when all blocking dependencies are satisfied.
+
+Key blockers: Python 3, uv, PyYAML (validation/packaging), gitleaks (security scan), claude CLI (evals). Run Python tools with explicit uv dependency declarations, for example `uv run --with PyYAML python -m scripts.quick_validate <skill-path>` from the skill-creator root directory. Bare `python3` depends on ambient site packages and can miss PyYAML.
+
+### Step 1: Understanding the Skill with Concrete Examples
+
+Skip this step only when the skill's usage patterns are already clearly understood.
+
+To create an effective skill, clearly understand concrete examples of how the skill will be used. This understanding can come from either direct user examples or generated examples that are validated with user feedback.
+
+For example, when building an image-editor skill, relevant questions include:
+
+- "What functionality should the image-editor skill support? Editing, rotating, anything else?"
+- "Can you give some examples of how this skill would be used?"
+- "What would a user say that should trigger this skill?"
+
+To avoid overwhelming users, avoid asking too many questions in a single message.
+
+### Step 2: Planning the Reusable Skill Contents
+
+Analyze each example by:
+
+1. Considering how to execute on the example from scratch
+2. Determining the appropriate level of freedom for Claude
+3. Identifying what scripts, references, and assets would be helpful when executing these workflows repeatedly
+
+**Match specificity to task risk:**
+- **High freedom (text instructions)**: Multiple valid approaches exist
+- **Medium freedom (pseudocode with parameters)**: Preferred patterns exist with acceptable variation
+- **Low freedom (exact scripts)**: Operations are fragile, consistency critical
+
+### Step 3: Initializing the Skill
+
+Skip this step if the skill already exists.
+
+When creating a new skill from scratch, always run the `init_skill.py` script:
+
+```bash
+scripts/init_skill.py <skill-name> --path <output-directory>
+```
+
+The script creates a template skill directory with proper frontmatter, resource directories, and example files.
+
+### Step 4: Edit the Skill
+
+When editing, remember that the skill is being created for another instance of Claude to use. Focus on information that would be beneficial and non-obvious to Claude.
+
+**When updating an existing skill**: Scan all existing reference files to check if they need corresponding updates.
+
+**Pipeline check**: Consider whether this skill's output naturally feeds into another skill. If so, add a "Next Step" handoff section (see "Pipeline Handoff" in the Skill Writing Guide). Also check if any existing skill should chain *into* this one.
+
+### Step 5: Sanitization Review (Optional)
+
+Use **AskUserQuestion** before executing this step:
+
+```
+This skill appears to contain content from a real project.
+Before distribution, I should check for business-specific details
+(company names, internal paths, product names) that shouldn't be public.
+
+RECOMMENDATION: Run selective sanitization — review each finding before removing.
+
+Options:
+A) Full sanitization — automatically remove all business-specific content
+B) Selective sanitization — show me each finding and let me decide (Recommended)
+C) Skip — this is for internal use only, no sanitization needed
+```
+
+Skip if: skill was created from scratch for public use, user declines, or skill is for internal use.
+
+**Sanitization process:**
+
+1. **Load the checklist**: Read [references/sanitization_checklist.md](references/sanitization_checklist.md) for detailed guidance
+2. **Run automated scans** to identify potential sensitive content
+3. **Review and replace** each category (product names, person names, entity names, paths, jargon)
+4. **Verify completeness**: Re-run patterns, read through skill, confirm functionality
+
+### Step 6: Security Review
+
+Before packaging or distributing a skill, run the security scanner to detect hardcoded secrets and personal information:
+
+```bash
+# Required before packaging
+python scripts/security_scan.py <path/to/skill-folder>
+
+# Verbose mode includes additional checks for paths, emails, and code patterns
+python scripts/security_scan.py <path/to/skill-folder> --verbose
+```
+
+**Detection coverage:**
+- Hardcoded secrets (API keys, passwords, tokens) via gitleaks
+- Personal information (usernames, emails, company names) in verbose mode
+- Unsafe code patterns (command injection risks) in verbose mode
+
+**First-time setup:** Install gitleaks if not present:
+
+```bash
+# macOS
+brew install gitleaks
+
+# Linux/Windows - see script output for installation instructions
+```
+
+**Exit codes:**
+- `0` - Clean (safe to package)
+- `1` - High severity issues
+- `2` - Critical issues (MUST fix before distribution)
+- `3` - gitleaks not installed
+- `4` - Scan error
+
+**If issues are found**, present them via **AskUserQuestion**:
+
+```
+Security scan found [N] issues in "[skill-name]":
+- [SEVERITY] [file]: [description]
+- ...
+
+RECOMMENDATION: Fix automatically — these look like [accidental leaks / false positives].
+
+Options:
+A) Fix all issues automatically (Recommended)
+B) Review each finding — let me decide per-item (some may be intentional)
+C) Override and proceed — I accept the risk for internal distribution
+```
+
+### Step 7: Packaging a Skill
+
+Once the skill is ready, package it into a distributable file:
+
+```bash
+cd <skill-creator-path>
+uv run --with PyYAML python -m scripts.package_skill <path/to/skill-folder>
+```
+
+Optional output directory:
+
+```bash
+cd <skill-creator-path>
+uv run --with PyYAML python -m scripts.package_skill <path/to/skill-folder> ./dist
+```
+
+The packaging script will:
+
+1. **Validate** the skill automatically (YAML frontmatter, naming conventions, path reference integrity)
+2. **Verify security scan** (content hash must match last scan)
+3. **Package** the skill into a distributable archive
+
+If validation fails, the script reports errors and exits without creating a package.
+
+### Step 8: Update Marketplace
+
+After packaging, update the marketplace registry to include the new or updated skill.
+
+**For new skills**, add an entry to `.claude-plugin/marketplace.json`:
+
+```json
+{
+  "name": "skill-name",
+  "description": "Copy from SKILL.md frontmatter description",
+  "source": "./skill-name",
+  "strict": false,
+  "version": "1.0.0",
+  "category": "developer-tools",
+  "keywords": ["relevant", "keywords"]
+}
+```
+
+**For updated skills**, bump the version in `plugins[].version` following semver.
+
+### Step 9: Ship or Iterate
+
+After completing the skill, use **AskUserQuestion** to determine next steps:
+
+```
+Skill "[name]" is complete. Security scan passed, marketplace updated.
+
+Options:
+A) Package and export as .skill file for distribution
+B) Run description optimization — improve auto-triggering accuracy (~5 min)
+C) Expand test set and iterate more — add edge cases before shipping
+D) Done for now — I'll test it manually and come back if needed
+```
+
+After testing the skill, users may request improvements. Often this happens right after using the skill, with fresh context of how the skill performed.
+
+**Refinement filter:** Only add what solves observed problems. If best practices already cover it, don't duplicate.
+
+---
+
+### Package and Present (only if `present_files` tool is available)
+
+Check whether you have access to the `present_files` tool. If you don't, skip this step. If you do, package the skill and present the .skill file to the user:
+
+```bash
+uv run --with PyYAML python -m scripts.package_skill <path/to/skill-folder>
+```
+
+After packaging, direct the user to the resulting `.skill` file path so they can install it.
+
+---
+
 ## Reference files
 
 The agents/ directory contains instructions for specialized subagents. Read them when you need to spawn the relevant subagent.
@@ -525,6 +1022,9 @@ The agents/ directory contains instructions for specialized subagents. Read them
 
 The references/ directory has additional documentation:
 - `references/schemas.md` — JSON structures for evals.json, grading.json, etc.
+- `references/sanitization_checklist.md` — Checklist for sanitizing business-specific content before public distribution
+- `references/prerequisites.md` — Checklist for prerequisite CLI tools and packages
+- `references/skill-development-methodology.md` — Domain SOP and development process
 
 ---
 

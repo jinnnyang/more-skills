@@ -84,10 +84,22 @@ description: A clear description of what this skill does and when to use it
 ```
 
 The frontmatter requires only two fields:
-- `name` - A unique identifier for your skill (lowercase, hyphens for spaces)
-- `description` - A complete description of what the skill does and when to use it
+- `name` - A-unique identifier for your skill (lowercase, hyphens for spaces)
+- `description` - A-complete description of what the skill does and when to use it
 
 The markdown content below contains the instructions, examples, and guidelines that Claude will follow. For more details, see [How to create custom skills](https://support.claude.com/en/articles/12512198-creating-custom-skills).
+
+# Advanced Skill Development with `skill-creator`
+
+For complex, production-grade skills, this repository includes an advanced meta-skill: `skills/skill-creator`. It implements the **Agent-Centric Software Engineering (ACSE)** methodology, offering the following capabilities:
+
+- **AskUserQuestion Protocol**: Enforces structured communication at decision points (re-grounding context, simplifying options, making explicit scale recommendations) to reduce cognitive load.
+- **Prior Art Research (Adopt/Extend/Build)**: Integrates an 8-channel prioritized lookup protocol (history, SOPs, plugins, community plugins, npm/PyPI, docs) to prevent reinventing the wheel.
+- **Wrapper Skills Workflow**: A dedicated retrospective distillation workflow for wrapping, configuring, diagnosing, and providing self-healing flags for existing CLI tools (e.g., `yt-dlp`).
+- **Progressive Discovery Pre-flight Checks**: Instructs agents to perform a "Cognitive Pause" and run lightweight environment probes (`uname`, `ver`, `$PSVersionTable`) instead of rigid, hardcoded sniffing scripts.
+- **learnings.md Bloat Protection**: Mandates a strict three-section memory template and statically checks that file sizes stay under 50 lines / 2KB to prevent context window pollution.
+- **Differential Guidance Density**: Reduces "guidance fatigue" by keeping happy path instructions to 1 line, while providing rich fallback hierarchies (`[AGENT GUIDANCE — FALLBACK STRATEGY]`) only on error/degradation paths.
+- **Automated Security Reviews**: Integrates gitleaks and secret scanners (`security_scan.py`) as mandatory gatekeepers before packaging.
 
 # Partner Skills
 
