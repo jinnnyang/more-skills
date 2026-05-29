@@ -111,11 +111,24 @@ def lint_skill_design(skill_path):
             )
 
     # Check for learnings.md
-    if not (skill_path / "learnings.md").exists():
+    learnings_path = skill_path / "learnings.md"
+    if not learnings_path.exists():
         warnings.append(
             "No learnings.md found. Consider creating one to capture "
             "lessons learned and common pitfalls."
         )
+    else:
+        try:
+            size_bytes = learnings_path.stat().st_size
+            if size_bytes > 2048:
+                warnings.append(f"learnings.md is large ({size_bytes} bytes). Consider summarizing/compressing to stay under 2KB.")
+            
+            content = learnings_path.read_text(encoding='utf-8')
+            num_lines = len(content.splitlines())
+            if num_lines > 50:
+                warnings.append(f"learnings.md has {num_lines} lines. Consider pruning older entries to stay under 50 lines.")
+        except OSError:
+            pass
 
     # Check scripts for [AGENT GUIDANCE]
     scripts_dir = skill_path / "scripts"

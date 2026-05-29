@@ -46,7 +46,7 @@ If the skill includes scripts that produce output, evaluate the quality of embed
 
 1. **Guidance Presence**: Do script outputs include `[AGENT GUIDANCE]` sections at key decision points?
 2. **Fallback Coverage**: Do error outputs include `[AGENT GUIDANCE — FALLBACK STRATEGY]` with ranked alternatives?
-3. **Guidance Relevance**: Does the guidance address the actual next decision the agent needs to make?
+3. **Guidance Density**: Is the guidance concise on the happy path (1 line) and detailed on error paths, preventing guidance fatigue?
 4. **Guidance Effectiveness**: Did the agent follow the guidance correctly in the transcript?
 
 Record findings for inclusion in the summary's `guidance_quality` field.

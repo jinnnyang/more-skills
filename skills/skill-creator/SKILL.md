@@ -44,19 +44,16 @@ It's OK to briefly explain terms if you're in doubt, and feel free to clarify te
 
 ## Creating a skill
 
-### Pre-flight Check (Collaborative Condition Checking)
+### Pre-flight Check (Progressive Discovery)
 
-Before diving into skill creation or modification, scan your environment. The purpose of this scan is to evaluate the available tools, skills, and resources so you can dynamically select and combine the optimal execution route/combination to complete the user's task.
+Before diving into skill creation or modification, scan your environment using a **Progressive Discovery** approach. Do NOT blindly run scripts or assume the platform.
 
-1. **Verify Environment & OS**: Check the current OS, shell, and file path formats (PowerShell vs Bash, Windows vs Linux paths).
-2. **Verify Required Tools**: Check for required external CLI tools (e.g. git, npm, python, pip, claude CLI).
-3. **Verify Env Variables**: Check for environment variables/credentials (e.g. ANTHROPIC_API_KEY, custom keys).
-4. **Verify Available MCP Tools**: Check for available MCP tools on the server.
-5. **Verify Related Skills**: Scan available skills in the workspace to avoid duplication or leverage existing patterns.
+1. **Cognitive Pause**: Before executing any commands, output a brief plain-text plan detailing what you need to verify (e.g., `Plan: 1. Identify OS. 2. Verify Node.js version.`). Do not use specific XML tags (like `<thought>`) as this causes overfitting across different models.
+2. **Adaptive Probing**: Run native, lightweight commands to establish your coordinates. Start with `ver`, `uname -a`, or `$PSVersionTable` to determine the OS and Shell.
+3. **Targeted Verification**: Once the platform is known, use the appropriate native tools (e.g., `which`, `where`, `Get-Command`) to verify required CLI tools, or check for specific environment variables.
+4. **Contextual Awareness**: Check available MCP tools and existing skills in the workspace to avoid duplication.
 
-Based on this inventory, design the most efficient and robust execution plan (e.g. delegating research to a subagent, using an existing script from another skill, or invoking a specific combination of MCP tools).
-
-Teach this same pattern to the skills you create — every skill's SKILL.md should include a lightweight Pre-flight Check section tailored to its domain.
+Teach this same pattern to the skills you create — every skill's SKILL.md should encourage the agent to progressively discover its environment rather than relying on hardcoded sniffing scripts.
 
 ### Capture Intent
 
@@ -102,9 +99,17 @@ skill-name/
 
 Skills can include a `learnings.md` file that accumulates operational knowledge across sessions. The agent reads it on startup and appends findings at wrap-up.
 
-**Format**: No strict format is enforced; the agent can decide how to structure the contents (e.g. using sections for gotchas, success patterns, and environment notes, or a simple chronological list).
+**Format**: Use the following strict three-section structure to prevent context bloat:
+```markdown
+## Known Environment Issues
+- [ ] ...
+## Success Patterns
+- [ ] ...
+## Failures & Anti-patterns
+- [ ] ...
+```
 
-**Lifecycle Rule**: Check `learnings.md` at the beginning of using a skill, and document any new findings or issues in `learnings.md` at the end of the session. Keep entries concise. Prune periodically to stay under 50 entries. This transforms a stateless skill into one that improves with use.
+**Lifecycle Rule**: Check `learnings.md` at the beginning of using a skill, and document any new findings in `learnings.md` at the end of the session. Keep entries concise. The file must stay under 50 lines / 2KB. If it grows larger, summarize and compress older entries to maintain tight cross-session memory.
 
 #### Progressive Disclosure
 
@@ -145,12 +150,10 @@ Scripts aren't just data pipelines — their output is the last thing the agent 
 - **Error-Prone Steps**: Steps where agents historically make wrong choices
 - **Degradation Paths**: When the primary approach fails, guide toward fallbacks
 
-**Example — success path (printed to stderr / in JSON key):**
-```
-[AGENT GUIDANCE]
-1. NEXT STEP: Extract only the relevant parameters for the user's task.
-2. CAUTION: Do NOT paste raw output to user — summarize the key findings.
-```
+**Differential Guidance Density**: To prevent "guidance fatigue", vary the verbosity based on the execution path:
+- **Happy Path (Success)**: Keep it ultra-concise (1 line max). Example:
+  `[AGENT GUIDANCE] SUCCESS. Next: parse result.json.`
+- **Error/Degradation Path**: Provide detailed, structured alternatives.
 
 **Example — error path:**
 ```
