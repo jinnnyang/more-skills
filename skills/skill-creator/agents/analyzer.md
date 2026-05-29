@@ -82,6 +82,14 @@ Based on the analysis, produce actionable suggestions for improving the loser sk
 - Examples to include
 - Edge cases to address
 
+Also evaluate the skill's adherence to design best practices:
+- Does the skill include a Pre-flight Check section in SKILL.md?
+- Do scripts embed `[AGENT GUIDANCE]` in their outputs at key decision points?
+- Do error paths include `[AGENT GUIDANCE — FALLBACK STRATEGY]` with ranked alternatives?
+- Does the skill maintain a `learnings.md` for cross-session memory?
+
+Include design-level findings as improvement suggestions using the existing `instructions` or `tools` categories.
+
 Prioritize by impact. Focus on changes that would have changed the outcome.
 
 ### Step 8: Write Analysis Results
@@ -175,6 +183,8 @@ Use these categories to organize improvement suggestions:
 | `error_handling` | Guidance for handling failures |
 | `structure` | Reorganization of skill content |
 | `references` | External docs or resources to add |
+| `guidance` | Agent Guidance design in script outputs |
+| `design_patterns` | Adherence to skill design best practices (Pre-flight Check, learnings.md, etc.) |
 
 ## Priority Levels
 

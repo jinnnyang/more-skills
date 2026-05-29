@@ -260,6 +260,16 @@ def generate_benchmark(benchmark_dir: Path, skill_name: str = "", skill_path: st
         for r in config
     ))
 
+    # Calculate actual runs per eval per configuration
+    runs_counts = []
+    for config_runs in results.values():
+        eval_runs: dict[int | str, int] = {}
+        for r in config_runs:
+            eval_runs.setdefault(r['eval_id'], 0)
+            eval_runs[r['eval_id']] += 1
+        runs_counts.extend(eval_runs.values())
+    runs_per_config = max(runs_counts) if runs_counts else 0
+
     benchmark = {
         "metadata": {
             "skill_name": skill_name or "<skill-name>",
@@ -268,7 +278,7 @@ def generate_benchmark(benchmark_dir: Path, skill_name: str = "", skill_path: st
             "analyzer_model": "<model-name>",
             "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "evals_run": eval_ids,
-            "runs_per_configuration": 3
+            "runs_per_configuration": runs_per_config
         },
         "runs": runs,
         "run_summary": run_summary,

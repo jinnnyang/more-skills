@@ -44,6 +44,20 @@ It's OK to briefly explain terms if you're in doubt, and feel free to clarify te
 
 ## Creating a skill
 
+### Pre-flight Check (Collaborative Condition Checking)
+
+Before diving into skill creation or modification, scan your environment. The purpose of this scan is to evaluate the available tools, skills, and resources so you can dynamically select and combine the optimal execution route/combination to complete the user's task.
+
+1. **Verify Environment & OS**: Check the current OS, shell, and file path formats (PowerShell vs Bash, Windows vs Linux paths).
+2. **Verify Required Tools**: Check for required external CLI tools (e.g. git, npm, python, pip, claude CLI).
+3. **Verify Env Variables**: Check for environment variables/credentials (e.g. ANTHROPIC_API_KEY, custom keys).
+4. **Verify Available MCP Tools**: Check for available MCP tools on the server.
+5. **Verify Related Skills**: Scan available skills in the workspace to avoid duplication or leverage existing patterns.
+
+Based on this inventory, design the most efficient and robust execution plan (e.g. delegating research to a subagent, using an existing script from another skill, or invoking a specific combination of MCP tools).
+
+Teach this same pattern to the skills you create — every skill's SKILL.md should include a lightweight Pre-flight Check section tailored to its domain.
+
 ### Capture Intent
 
 Start by understanding the user's intent. The current conversation might already contain a workflow the user wants to capture (e.g., they say "turn this into a skill"). If so, extract answers from the conversation history first — the tools used, the sequence of steps, corrections the user made, input/output formats observed. The user may need to fill the gaps, and should confirm before proceeding to the next step.
@@ -77,11 +91,20 @@ skill-name/
 ├── SKILL.md (required)
 │   ├── YAML frontmatter (name, description required)
 │   └── Markdown instructions
+├── learnings.md (optional) - Cross-session memory (auto-appended by agent)
 └── Bundled Resources (optional)
     ├── scripts/    - Executable code for deterministic/repetitive tasks
     ├── references/ - Docs loaded into context as needed
     └── assets/     - Files used in output (templates, icons, fonts)
 ```
+
+#### Cross-Session Memory (learnings.md)
+
+Skills can include a `learnings.md` file that accumulates operational knowledge across sessions. The agent reads it on startup and appends findings at wrap-up.
+
+**Format**: No strict format is enforced; the agent can decide how to structure the contents (e.g. using sections for gotchas, success patterns, and environment notes, or a simple chronological list).
+
+**Lifecycle Rule**: Check `learnings.md` at the beginning of using a skill, and document any new findings or issues in `learnings.md` at the end of the session. Keep entries concise. Prune periodically to stay under 50 entries. This transforms a stateless skill into one that improves with use.
 
 #### Progressive Disclosure
 
@@ -107,6 +130,37 @@ cloud-deploy/
     └── azure.md
 ```
 Claude reads only the relevant reference file.
+
+#### Script Output Design (Agent Guidance)
+
+Scripts aren't just data pipelines — their output is the last thing the agent sees before making its next decision. Design outputs to guide that decision.
+
+**Structured Output Protocol**: Every script should structure its output. If the script outputs JSON, include a `"guidance"` key in the JSON object. Additionally, print the guidance directly to `stderr` so it stands out immediately in the tool execution output:
+
+1. `[AGENT GUIDANCE]` — What the agent should do next with this data.
+2. `[AGENT GUIDANCE — FALLBACK STRATEGY]` — On error: ranked alternatives.
+
+**When to embed guidance** (the three critical junctures):
+- **Key Decision Points**: When the output determines the agent's next branch
+- **Error-Prone Steps**: Steps where agents historically make wrong choices
+- **Degradation Paths**: When the primary approach fails, guide toward fallbacks
+
+**Example — success path (printed to stderr / in JSON key):**
+```
+[AGENT GUIDANCE]
+1. NEXT STEP: Extract only the relevant parameters for the user's task.
+2. CAUTION: Do NOT paste raw output to user — summarize the key findings.
+```
+
+**Example — error path:**
+```
+[AGENT GUIDANCE — FALLBACK STRATEGY]
+1. FALLBACK: Try alternative_command --flag to get a partial result.
+2. ESCALATE: If fallback also fails, search the web for the latest docs.
+3. DO NOT: Guess syntax — always verify from a reference source.
+```
+
+The reasoning: today's models are smart enough to follow nuanced guidance, but they need it at the right moment — embedded in the tool output they're actively processing, not buried in a 500-line SKILL.md they read 10 steps ago.
 
 #### Principle of Lack of Surprise
 
@@ -302,6 +356,8 @@ This is the heart of the loop. You've run the test cases, the user has reviewed 
 3. **Explain the why.** Try hard to explain the **why** behind everything you're asking the model to do. Today's LLMs are *smart*. They have good theory of mind and when given a good harness can go beyond rote instructions and really make things happen. Even if the feedback from the user is terse or frustrated, try to actually understand the task and why the user is writing what they wrote, and what they actually wrote, and then transmit this understanding into the instructions. If you find yourself writing ALWAYS or NEVER in all caps, or using super rigid structures, that's a yellow flag — if possible, reframe and explain the reasoning so that the model understands why the thing you're asking for is important. That's a more humane, powerful, and effective approach.
 
 4. **Look for repeated work across test cases.** Read the transcripts from the test runs and notice if the subagents all independently wrote similar helper scripts or took the same multi-step approach to something. If all 3 test cases resulted in the subagent writing a `create_docx.py` or a `build_chart.py`, that's a strong signal the skill should bundle that script. Write it once, put it in `scripts/`, and tell the skill to use it. This saves every future invocation from reinventing the wheel.
+
+5. **Design script outputs as guidance, not just data.** Read the transcripts and look for moments where the agent received a script's output and then made a wrong decision. That's a signal the output lacked guidance. Add `[AGENT GUIDANCE]` sections to script outputs at those decision points — tell the agent what to do next, what to avoid, and where to fall back. This is often more effective than adding more instructions to SKILL.md, because the guidance arrives at the exact moment the agent needs it.
 
 This task is pretty important (we are trying to create billions a year in economic value here!) and your thinking time is not the blocker; take your time and really mull things over. I'd suggest writing a draft revision and then looking at it anew and making improvements. Really do your best to get into the head of the user and understand what they want and need.
 

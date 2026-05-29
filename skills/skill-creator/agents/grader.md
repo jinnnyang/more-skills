@@ -40,6 +40,17 @@ For each expectation:
    - **FAIL**: No evidence, or evidence contradicts the expectation, or the evidence is superficial (e.g., correct filename but empty/wrong content)
 3. **Cite the evidence**: Quote the specific text or describe what you found
 
+### Step 3b: Evaluate Agent Guidance Quality (if applicable)
+
+If the skill includes scripts that produce output, evaluate the quality of embedded Agent Guidance:
+
+1. **Guidance Presence**: Do script outputs include `[AGENT GUIDANCE]` sections at key decision points?
+2. **Fallback Coverage**: Do error outputs include `[AGENT GUIDANCE — FALLBACK STRATEGY]` with ranked alternatives?
+3. **Guidance Relevance**: Does the guidance address the actual next decision the agent needs to make?
+4. **Guidance Effectiveness**: Did the agent follow the guidance correctly in the transcript?
+
+Record findings for inclusion in the summary's `guidance_quality` field.
+
 ### Step 4: Extract and Verify Claims
 
 Beyond the predefined expectations, extract implicit claims from the outputs and verify them:
@@ -130,7 +141,12 @@ Write a JSON file with this structure:
     "passed": 2,
     "failed": 1,
     "total": 3,
-    "pass_rate": 0.67
+    "pass_rate": 0.67,
+    "guidance_quality": {
+      "has_guidance": true,
+      "followed_guidance": true,
+      "notes": "Agent followed FALLBACK STRATEGY when OCR failed, correctly switching to image preprocessing"
+    }
   },
   "execution_metrics": {
     "tool_calls": {
@@ -194,6 +210,10 @@ Write a JSON file with this structure:
   - **failed**: Count of failed expectations
   - **total**: Total expectations evaluated
   - **pass_rate**: Fraction passed (0.0 to 1.0)
+  - **guidance_quality**: Assessment of Agent Guidance in script outputs (if applicable)
+    - **has_guidance**: Whether scripts include `[AGENT GUIDANCE]` sections
+    - **followed_guidance**: Whether the agent followed the embedded guidance
+    - **notes**: Specific observations about guidance effectiveness
 - **execution_metrics**: Copied from executor's metrics.json (if available)
   - **output_chars**: Total character count of output files (proxy for tokens)
   - **transcript_chars**: Character count of transcript

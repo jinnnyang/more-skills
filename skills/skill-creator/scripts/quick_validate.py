@@ -19,7 +19,7 @@ def validate_skill(skill_path):
         return False, "SKILL.md not found"
 
     # Read and validate frontmatter
-    content = skill_md.read_text()
+    content = skill_md.read_text(encoding='utf-8')
     if not content.startswith('---'):
         return False, "No YAML frontmatter found"
 
@@ -93,11 +93,71 @@ def validate_skill(skill_path):
 
     return True, "Skill is valid!"
 
+
+def lint_skill_design(skill_path):
+    """Return a list of design lint warning strings for a skill."""
+    skill_path = Path(skill_path)
+    warnings = []
+
+    # Check SKILL.md for pre-flight / collaborative condition checking patterns
+    skill_md = skill_path / "SKILL.md"
+    if skill_md.exists():
+        content = skill_md.read_text(encoding='utf-8').lower()
+        if "pre-flight check" not in content and "collaborative condition checking" not in content:
+            warnings.append(
+                "SKILL.md does not mention 'Pre-flight Check' or "
+                "'Collaborative Condition Checking'. Consider adding a pre-flight "
+                "section to validate prerequisites before execution."
+            )
+
+    # Check for learnings.md
+    if not (skill_path / "learnings.md").exists():
+        warnings.append(
+            "No learnings.md found. Consider creating one to capture "
+            "lessons learned and common pitfalls."
+        )
+
+    # Check scripts for [AGENT GUIDANCE]
+    scripts_dir = skill_path / "scripts"
+    if scripts_dir.exists() and scripts_dir.is_dir():
+        script_extensions = {".py", ".sh", ".ps1", ".js", ".ts"}
+        for script_file in scripts_dir.iterdir():
+            if script_file.is_file() and script_file.suffix in script_extensions:
+                try:
+                    script_content = script_file.read_text(errors="replace")
+                    if "[AGENT GUIDANCE]" not in script_content:
+                        warnings.append(
+                            f"Script '{script_file.name}' does not contain "
+                            f"[AGENT GUIDANCE]. Consider adding guidance output "
+                            f"so the calling agent knows what to do next."
+                        )
+                except OSError:
+                    pass
+
+    return warnings
+
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python quick_validate.py <skill_directory>")
         sys.exit(1)
-    
+
     valid, message = validate_skill(sys.argv[1])
     print(message)
+
+    # Run design lint (warnings only — do NOT affect exit code)
+    warnings = lint_skill_design(sys.argv[1])
+    if warnings:
+        print()
+        for w in warnings:
+            print(f"WARNING: {w}")
+
+    # Agent guidance
+    guidance = (
+        "[AGENT GUIDANCE]\n"
+        "1. Fix any validation errors (FAIL) immediately.\n"
+        "2. Review ⚠️ WARNING items — they are recommendations that improve skill reliability."
+    )
+    print(guidance, file=sys.stderr)
+
     sys.exit(0 if valid else 1)

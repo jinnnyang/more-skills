@@ -8,15 +8,34 @@ for a set of queries. Outputs results as JSON.
 import argparse
 import json
 import os
-import select
+import queue
+import shutil
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 from scripts.utils import parse_skill_md
+
+
+def check_environment() -> dict | None:
+    """Verify that the claude CLI is available. Returns error dict or None."""
+    if shutil.which("claude") is None:
+        guidance = (
+            "[AGENT GUIDANCE \u2014 FALLBACK STRATEGY]\n"
+            "The 'claude' CLI was not found on PATH.\n"
+            "1. Install it: npm install -g @anthropic-ai/claude-code\n"
+            "2. Or ensure it is on your PATH before running this script."
+        )
+        return {
+            "status": "error",
+            "message": "claude CLI not found on PATH",
+            "guidance": guidance,
+        }
+    return None
 
 
 def find_project_root() -> Path:
@@ -97,22 +116,33 @@ def run_single_query(
         pending_tool_name = None
         accumulated_json = ""
 
+        # Cross-platform I/O: use a daemon thread + queue instead of select()
+        line_queue: queue.Queue[str | None] = queue.Queue()
+
+        def _reader_thread(stdout, q):
+            try:
+                for raw_line in iter(stdout.readline, b""):
+                    q.put(raw_line.decode("utf-8", errors="replace"))
+            finally:
+                q.put(None)  # sentinel
+
+        reader = threading.Thread(
+            target=_reader_thread, args=(process.stdout, line_queue), daemon=True
+        )
+        reader.start()
+
         try:
             while time.time() - start_time < timeout:
-                if process.poll() is not None:
-                    remaining = process.stdout.read()
-                    if remaining:
-                        buffer += remaining.decode("utf-8", errors="replace")
-                    break
-
-                ready, _, _ = select.select([process.stdout], [], [], 1.0)
-                if not ready:
+                try:
+                    raw_line = line_queue.get(timeout=1.0)
+                except queue.Empty:
+                    if process.poll() is not None:
+                        break
                     continue
 
-                chunk = os.read(process.stdout.fileno(), 8192)
-                if not chunk:
+                if raw_line is None:
                     break
-                buffer += chunk.decode("utf-8", errors="replace")
+                buffer += raw_line
 
                 while "\n" in buffer:
                     line, buffer = buffer.split("\n", 1)
@@ -257,6 +287,13 @@ def run_eval(
 
 
 def main():
+    # Pre-check: ensure claude CLI is available
+    env_error = check_environment()
+    if env_error:
+        print(env_error["guidance"], file=sys.stderr)
+        print(json.dumps(env_error))
+        sys.exit(1)
+
     parser = argparse.ArgumentParser(description="Run trigger evaluation for a skill description")
     parser.add_argument("--eval-set", required=True, help="Path to eval set JSON file")
     parser.add_argument("--skill-path", required=True, help="Path to skill directory")
@@ -302,6 +339,16 @@ def main():
             status = "PASS" if r["pass"] else "FAIL"
             rate_str = f"{r['triggers']}/{r['runs']}"
             print(f"  [{status}] rate={rate_str} expected={r['should_trigger']}: {r['query'][:70]}", file=sys.stderr)
+
+    # Add agent guidance to output
+    guidance = (
+        "[AGENT GUIDANCE]\n"
+        "1. Review the pass/fail results above.\n"
+        "2. If failures exist, run improve_description.py to generate an improved description.\n"
+        "3. Use run_loop.py for automated iterative optimization."
+    )
+    output["guidance"] = guidance
+    print(guidance, file=sys.stderr)
 
     print(json.dumps(output, indent=2))
 

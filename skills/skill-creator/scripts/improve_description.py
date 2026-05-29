@@ -161,14 +161,15 @@ Please respond with only the new description text in <new_description> tags, not
     # SDK path did this as a true multi-turn; `claude -p` is one-shot, so we
     # inline the prior output into the new prompt instead.)
     if len(description) > 1024:
+        # Concise compression prompt — avoids re-sending the full original prompt
+        # to save ~50% tokens vs the previous approach.
         shorten_prompt = (
-            f"{prompt}\n\n"
-            f"---\n\n"
-            f"A previous attempt produced this description, which at "
-            f"{len(description)} characters is over the 1024-character hard limit:\n\n"
+            f"The following skill description for \"{skill_name}\" is "
+            f"{len(description)} characters, which exceeds the 1024-character hard limit.\n\n"
             f'"{description}"\n\n'
             f"Rewrite it to be under 1024 characters while keeping the most "
-            f"important trigger words and intent coverage. Respond with only "
+            f"important trigger words and intent coverage. Keep it concise "
+            f"and focused on user intent. Respond with only "
             f"the new description in <new_description> tags."
         )
         shorten_text = _call_claude(shorten_prompt, model)
@@ -240,6 +241,17 @@ def main():
             "results": eval_results["results"],
         }],
     }
+
+    # Add agent guidance
+    guidance = (
+        "[AGENT GUIDANCE]\n"
+        "1. Review the new description for accuracy before applying.\n"
+        "2. Run run_eval.py to verify trigger rate improved.\n"
+        "3. If char_count > 900, consider further compression in next iteration."
+    )
+    output["guidance"] = guidance
+    print(guidance, file=sys.stderr)
+
     print(json.dumps(output, indent=2))
 
 
