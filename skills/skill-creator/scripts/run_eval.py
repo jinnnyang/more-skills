@@ -15,26 +15,40 @@ import sys
 import threading
 import time
 import uuid
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from scripts.utils import parse_skill_md
 
 
-def check_environment() -> dict | None:
-    """Verify that the claude CLI is available. Returns error dict or None."""
-    if shutil.which("claude") is None:
-        guidance = (
-            "[AGENT GUIDANCE \u2014 FALLBACK STRATEGY]\n"
-            "The 'claude' CLI was not found on PATH.\n"
-            "1. Install it: npm install -g @anthropic-ai/claude-code\n"
-            "2. Or ensure it is on your PATH before running this script."
-        )
+def check_environment():
+    """Verify prerequisites before running eval."""
+    import shutil
+    import subprocess
+    
+    if not shutil.which("claude"):
         return {
             "status": "error",
-            "message": "claude CLI not found on PATH",
-            "guidance": guidance,
+            "message": "Claude CLI is not installed or not in PATH.",
+            "guidance": "[AGENT GUIDANCE — FALLBACK STRATEGY]\n"
+                        "1. VERIFY: Is 'claude' installed? Run `npm install -g @anthropic-ai/claude-cli` if needed.\n"
+                        "2. VERIFY: Is it in PATH? Provide the full path to the executable if known."
         }
+        
+    try:
+        # Run a low-cost state check to catch auth/network issues
+        result = subprocess.run(["claude", "--version"], capture_output=True, text=True, check=True)
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Claude CLI is in PATH but execution failed: {str(e)}",
+            "guidance": "[AGENT GUIDANCE — FALLBACK STRATEGY]\n"
+                        "1. LOGIN: The CLI might not be authenticated. Prompt the user to run `claude login`.\n"
+                        "2. NETWORK: Check network connectivity or API keys.\n"
+                        "3. ESCALATE: The CLI might be corrupted. Try reinstalling."
+        }
+        
     return None
 
 

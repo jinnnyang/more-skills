@@ -120,13 +120,19 @@ def lint_skill_design(skill_path):
     else:
         try:
             size_bytes = learnings_path.stat().st_size
-            if size_bytes > 2048:
-                warnings.append(f"learnings.md is large ({size_bytes} bytes). Consider summarizing/compressing to stay under 2KB.")
-            
             content = learnings_path.read_text(encoding='utf-8')
             num_lines = len(content.splitlines())
-            if num_lines > 50:
-                warnings.append(f"learnings.md has {num_lines} lines. Consider pruning older entries to stay under 50 lines.")
+            
+            compression_prompt = (
+                "Please merge duplicated errors, remove resolved environment issues, "
+                "retain only active environmental traps and highly valuable success patterns. "
+                "Output as a maximum of 10 concise bullet points."
+            )
+            
+            if size_bytes > 2048:
+                warnings.append(f"learnings.md is large ({size_bytes} bytes). [AGENT GUIDANCE]: {compression_prompt}")
+            elif num_lines > 50:
+                warnings.append(f"learnings.md has {num_lines} lines. [AGENT GUIDANCE]: {compression_prompt}")
         except OSError:
             pass
 

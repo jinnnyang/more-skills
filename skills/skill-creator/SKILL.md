@@ -109,7 +109,7 @@ Skills can include a `learnings.md` file that accumulates operational knowledge 
 - [ ] ...
 ```
 
-**Lifecycle Rule**: Check `learnings.md` at the beginning of using a skill, and document any new findings in `learnings.md` at the end of the session. Keep entries concise. The file must stay under 50 lines / 2KB. If it grows larger, summarize and compress older entries to maintain tight cross-session memory.
+**Lifecycle Rule (Auto-Load, Append-Write)**: `learnings.md` is automatically injected into your context by the framework when the skill is loaded. You do NOT need to spend a tool call to read it initially. At the end of the session, you must **Append Write** any new findings. The file must stay under 50 lines / 2KB. If it grows larger, summarize and compress older entries (remove resolved issues, keep active traps, max 10 bullet points) to maintain tight cross-session memory.
 
 #### Progressive Disclosure
 
