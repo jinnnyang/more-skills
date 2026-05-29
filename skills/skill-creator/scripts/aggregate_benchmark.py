@@ -78,7 +78,11 @@ def load_run_results(benchmark_dir: Path) -> dict:
     elif list(benchmark_dir.glob("eval-*")):
         search_dir = benchmark_dir
     else:
-        print(f"No eval directories found in {benchmark_dir} or {benchmark_dir / 'runs'}")
+        print(f"Error: No eval directories found in {benchmark_dir} or {benchmark_dir / 'runs'}.", file=sys.stderr)
+        print("Expected directory layout:", file=sys.stderr)
+        print("  <benchmark_dir>/eval-N/with_skill/grading.json (flat layout)", file=sys.stderr)
+        print("  OR <benchmark_dir>/eval-N/with_skill/run-M/grading.json (nested layout)", file=sys.stderr)
+        print("Please verify your benchmark outputs exist and contain valid grading.json files.", file=sys.stderr)
         return {}
 
     results: dict[str, list] = {}
@@ -87,7 +91,7 @@ def load_run_results(benchmark_dir: Path) -> dict:
         metadata_path = eval_dir / "eval_metadata.json"
         if metadata_path.exists():
             try:
-                with open(metadata_path) as mf:
+                with open(metadata_path, encoding="utf-8") as mf:
                     eval_id = json.load(mf).get("eval_id", eval_idx)
             except (json.JSONDecodeError, OSError):
                 eval_id = eval_idx
@@ -102,22 +106,33 @@ def load_run_results(benchmark_dir: Path) -> dict:
             if not config_dir.is_dir():
                 continue
             # Skip non-config directories (inputs, outputs, etc.)
-            if not list(config_dir.glob("run-*")):
+            has_runs = bool(list(config_dir.glob("run-*")))
+            has_direct_grading = (config_dir / "grading.json").exists()
+            if not has_runs and not has_direct_grading:
                 continue
+
             config = config_dir.name
             if config not in results:
                 results[config] = []
 
-            for run_dir in sorted(config_dir.glob("run-*")):
-                run_number = int(run_dir.name.split("-")[1])
-                grading_file = run_dir / "grading.json"
+            runs_to_parse = []
+            if has_runs:
+                for run_dir in sorted(config_dir.glob("run-*")):
+                    try:
+                        run_number = int(run_dir.name.split("-")[1])
+                    except (ValueError, IndexError):
+                        run_number = 1
+                    runs_to_parse.append((run_number, run_dir / "grading.json", run_dir))
+            else:
+                runs_to_parse.append((1, config_dir / "grading.json", config_dir))
 
+            for run_number, grading_file, run_dir in runs_to_parse:
                 if not grading_file.exists():
                     print(f"Warning: grading.json not found in {run_dir}")
                     continue
 
                 try:
-                    with open(grading_file) as f:
+                    with open(grading_file, encoding="utf-8") as f:
                         grading = json.load(f)
                 except json.JSONDecodeError as e:
                     print(f"Warning: Invalid JSON in {grading_file}: {e}")
@@ -139,7 +154,7 @@ def load_run_results(benchmark_dir: Path) -> dict:
                 timing_file = run_dir / "timing.json"
                 if result["time_seconds"] == 0.0 and timing_file.exists():
                     try:
-                        with open(timing_file) as tf:
+                        with open(timing_file, encoding="utf-8") as tf:
                             timing_data = json.load(tf)
                         result["time_seconds"] = timing_data.get("total_duration_seconds", 0.0)
                         result["tokens"] = timing_data.get("total_tokens", 0)
@@ -169,6 +184,13 @@ def load_run_results(benchmark_dir: Path) -> dict:
                 result["notes"] = notes
 
                 results[config].append(result)
+
+    if not results or not any(results.values()):
+        print("Error: No benchmark results could be loaded.", file=sys.stderr)
+        print("Expected directory layout:", file=sys.stderr)
+        print("  <benchmark_dir>/eval-N/with_skill/grading.json (flat layout)", file=sys.stderr)
+        print("  OR <benchmark_dir>/eval-N/with_skill/run-M/grading.json (nested layout)", file=sys.stderr)
+        print("Please verify your benchmark outputs exist and contain valid grading.json files.", file=sys.stderr)
 
     return results
 
@@ -384,13 +406,13 @@ def main():
     output_md = output_json.with_suffix(".md")
 
     # Write benchmark.json
-    with open(output_json, "w") as f:
+    with open(output_json, "w", encoding="utf-8") as f:
         json.dump(benchmark, f, indent=2)
     print(f"Generated: {output_json}")
 
     # Write benchmark.md
     markdown = generate_markdown(benchmark)
-    with open(output_md, "w") as f:
+    with open(output_md, "w", encoding="utf-8") as f:
         f.write(markdown)
     print(f"Generated: {output_md}")
 

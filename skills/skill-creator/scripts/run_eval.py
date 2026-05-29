@@ -9,11 +9,14 @@ import argparse
 import json
 import os
 import queue
+import re
 import shutil
 import subprocess
 import sys
 import threading
 import time
+import urllib.request
+import urllib.error
 import uuid
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -23,33 +26,58 @@ from scripts.utils import parse_skill_md
 
 
 def check_environment():
-    """Verify prerequisites before running eval."""
+    """Verify prerequisites before running eval and select active evaluation tier."""
     import shutil
-    import subprocess
+    import os
+    import sys
     
-    if not shutil.which("claude"):
-        return {
-            "status": "error",
-            "message": "Claude CLI is not installed or not in PATH.",
-            "guidance": "[AGENT GUIDANCE — FALLBACK STRATEGY]\n"
-                        "1. VERIFY: Is 'claude' installed? Run `npm install -g @anthropic-ai/claude-cli` if needed.\n"
-                        "2. VERIFY: Is it in PATH? Provide the full path to the executable if known."
-        }
+    # 1. Check Python Interpreter Stub
+    from pathlib import Path
+    executable_path = Path(sys.executable)
+    stub_detected = False
+    if "WindowsApps" in executable_path.parts:
+        stub_detected = True
+    else:
+        for cmd in ["python", "python3"]:
+            which_path = shutil.which(cmd)
+            if which_path and "WindowsApps" in Path(which_path).parts:
+                stub_detected = True
+                break
+    
+    if stub_detected:
+        print(
+            "WARNING: Active Python interpreter or PATH command seems to be the Microsoft Store stub.\n"
+            "[AGENT GUIDANCE — PYTHON STUB DETECTED]\n"
+            "This can cause execution failures or open the App Store. Troubleshooting:\n"
+            "1. Install Python from python.org or via winget: `winget install Python.Python.3.11`\n"
+            "2. Disable App Execution Aliases: Search Windows for 'Manage app execution aliases' and toggle off 'Python' and 'Python3'.",
+            file=sys.stderr
+        )
         
-    try:
-        # Run a low-cost state check to catch auth/network issues
-        result = subprocess.run(["claude", "--version"], capture_output=True, text=True, check=True)
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Claude CLI is in PATH but execution failed: {str(e)}",
-            "guidance": "[AGENT GUIDANCE — FALLBACK STRATEGY]\n"
-                        "1. LOGIN: The CLI might not be authenticated. Prompt the user to run `claude login`.\n"
-                        "2. NETWORK: Check network connectivity or API keys.\n"
-                        "3. ESCALATE: The CLI might be corrupted. Try reinstalling."
-        }
-        
-    return None
+    # 2. Check and announce active evaluation tier
+    if shutil.which("claude"):
+        return None
+    elif os.environ.get("OPENAI_API_KEY"):
+        base_url = os.environ.get("OPENAI_BASE_URL") or os.environ.get("OPENAI_API_BASE") or "https://api.openai.com/v1"
+        model_name = os.environ.get("OPENAI_MODEL_NAME") or "gpt-4o"
+        print(
+            "[AGENT GUIDANCE — FALLBACK STRATEGY]\n"
+            f"Claude CLI not found/failed. Using OpenAI-Compatible API fallback (Tier 2).\n"
+            f"Endpoint: {base_url}\n"
+            f"Model: {model_name}",
+            file=sys.stderr
+        )
+        return None
+    else:
+        print(
+            "[AGENT GUIDANCE — FALLBACK STRATEGY]\n"
+            "Claude CLI not found and OPENAI_API_KEY is not set. Using local Heuristic Matcher (Tier 3).\n"
+            "For more accurate evaluations, please either:\n"
+            "  a) Install the Claude CLI (`npm install -g @anthropic-ai/claude-cli`)\n"
+            "  b) Set OPENAI_API_KEY, and optionally OPENAI_BASE_URL/OPENAI_MODEL_NAME.",
+            file=sys.stderr
+        )
+        return None
 
 
 def find_project_root() -> Path:
@@ -65,7 +93,7 @@ def find_project_root() -> Path:
     return current
 
 
-def run_single_query(
+def run_tier1_claude_cli(
     query: str,
     skill_name: str,
     skill_description: str,
@@ -73,14 +101,7 @@ def run_single_query(
     project_root: str,
     model: str | None = None,
 ) -> bool:
-    """Run a single query and return whether the skill was triggered.
-
-    Creates a command file in .claude/commands/ so it appears in Claude's
-    available_skills list, then runs `claude -p` with the raw query.
-    Uses --include-partial-messages to detect triggering early from
-    stream events (content_block_start) rather than waiting for the
-    full assistant message, which only arrives after tool execution.
-    """
+    """Evaluate triggering using Claude CLI (Tier 1)."""
     unique_id = uuid.uuid4().hex[:8]
     clean_name = f"{skill_name}-skill-{unique_id}"
     project_commands_dir = Path(project_root) / ".claude" / "commands"
@@ -98,7 +119,7 @@ def run_single_query(
             f"# {skill_name}\n\n"
             f"This skill handles: {skill_description}\n"
         )
-        command_file.write_text(command_content)
+        command_file.write_text(command_content, encoding="utf-8")
 
         cmd = [
             "claude",
@@ -110,9 +131,6 @@ def run_single_query(
         if model:
             cmd.extend(["--model", model])
 
-        # Remove CLAUDECODE env var to allow nesting claude -p inside a
-        # Claude Code session. The guard is for interactive terminal conflicts;
-        # programmatic subprocess usage is safe.
         env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
 
         process = subprocess.Popen(
@@ -126,7 +144,6 @@ def run_single_query(
         triggered = False
         start_time = time.time()
         buffer = ""
-        # Track state for stream event detection
         pending_tool_name = None
         accumulated_json = ""
 
@@ -225,6 +242,111 @@ def run_single_query(
             command_file.unlink()
 
 
+def run_tier2_openai_api(
+    query: str,
+    skill_name: str,
+    skill_description: str,
+    timeout: int,
+) -> bool:
+    """Evaluate triggering using an OpenAI-Compatible Chat Completions API (Tier 2)."""
+    api_key = os.environ.get("OPENAI_API_KEY")
+    base_url = os.environ.get("OPENAI_BASE_URL") or os.environ.get("OPENAI_API_BASE") or "https://api.openai.com/v1"
+    model_name = os.environ.get("OPENAI_MODEL_NAME") or "gpt-4o"
+
+    system_prompt = (
+        "You are a system classifier deciding if a custom command/skill should be executed "
+        "to handle a user query. Respond with exactly 'YES' or 'NO' (no other text, explanation, or punctuation)."
+    )
+    user_prompt = (
+        f"Skill Name: {skill_name}\n"
+        f"Skill Description:\n{skill_description}\n\n"
+        f"User Query:\n{query}\n\n"
+        f"Should this skill be triggered to handle the user's query?"
+    )
+
+    url = f"{base_url.rstrip('/')}/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+
+    payload = {
+        "model": model_name,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        "temperature": 0.0,
+        "max_tokens": 5
+    }
+
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers=headers,
+        method="POST"
+    )
+
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        resp_data = json.loads(response.read().decode("utf-8"))
+        ans = resp_data["choices"][0]["message"]["content"].strip().upper()
+        return "YES" in ans
+
+
+def run_tier3_heuristics(query: str, skill_name: str, skill_description: str) -> bool:
+    """Local keyword containment heuristic check to see if the skill triggers (Tier 3)."""
+    stop_words = {
+        "a", "an", "the", "and", "or", "but", "if", "then", "else", "when", 
+        "at", "by", "for", "from", "in", "into", "of", "off", "on", "onto", 
+        "out", "over", "to", "up", "with", "is", "was", "were", "be", "been",
+        "has", "have", "had", "do", "does", "did", "can", "could", "should",
+        "would", "will", "i", "you", "he", "she", "it", "we", "they", "me",
+        "him", "her", "us", "them", "my", "your", "his", "their", "our"
+    }
+
+    def tokenize(text: str) -> set[str]:
+        words = re.findall(r'[a-zA-Z0-9-]+', text.lower())
+        return {w for w in words if len(w) > 2 and w not in stop_words}
+
+    query_tokens = tokenize(query)
+    skill_tokens = tokenize(skill_name) | tokenize(skill_description)
+
+    name_tokens = tokenize(skill_name)
+    if query_tokens & name_tokens:
+        return True
+
+    overlap = query_tokens & skill_tokens
+    return len(overlap) >= 2
+
+
+def run_single_query(
+    query: str,
+    skill_name: str,
+    skill_description: str,
+    timeout: int,
+    project_root: str,
+    model: str | None = None,
+) -> bool:
+    """Run a single query and check if the skill was triggered using Tier 1, 2, or 3."""
+    # Tier 1: Claude CLI
+    if shutil.which("claude"):
+        try:
+            return run_tier1_claude_cli(query, skill_name, skill_description, timeout, project_root, model)
+        except Exception:
+            pass
+
+    # Tier 2: OpenAI-Compatible API
+    if os.environ.get("OPENAI_API_KEY"):
+        try:
+            return run_tier2_openai_api(query, skill_name, skill_description, timeout)
+        except Exception:
+            pass
+
+    # Tier 3: Heuristic Matcher
+    return run_tier3_heuristics(query, skill_name, skill_description)
+
+
+
 def run_eval(
     eval_set: list[dict],
     skill_name: str,
@@ -320,7 +442,7 @@ def main():
     parser.add_argument("--verbose", action="store_true", help="Print progress to stderr")
     args = parser.parse_args()
 
-    eval_set = json.loads(Path(args.eval_set).read_text())
+    eval_set = json.loads(Path(args.eval_set).read_text(encoding="utf-8"))
     skill_path = Path(args.skill_path)
 
     if not (skill_path / "SKILL.md").exists():

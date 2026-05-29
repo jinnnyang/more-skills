@@ -156,10 +156,50 @@ def lint_skill_design(skill_path):
     return warnings
 
 
+def check_python_interpreter():
+    """Check if the Python interpreter is the Microsoft Store stub."""
+    import sys
+    import shutil
+    from pathlib import Path
+
+    # Check current interpreter
+    executable_path = Path(sys.executable)
+    if "WindowsApps" in executable_path.parts:
+        return (
+            f"Active Python interpreter seems to be the Microsoft Store stub: {sys.executable}\n"
+            "[AGENT GUIDANCE — PYTHON STUB DETECTED]\n"
+            "The Microsoft Store Python stub can cause issues, exit code 1, or open the App Store.\n"
+            "Troubleshooting Steps:\n"
+            "1. Install Python from python.org or via winget: `winget install Python.Python.3.11`\n"
+            "2. Disable App Execution Aliases: Search Windows for 'Manage app execution aliases' and toggle off 'Python' and 'Python3'.\n"
+            "3. Update your PATH environment variable to prioritize the real Python installation."
+        )
+
+    # Check python/python3 in PATH
+    for cmd in ["python", "python3"]:
+        which_path = shutil.which(cmd)
+        if which_path and "WindowsApps" in Path(which_path).parts:
+            return (
+                f"Command '{cmd}' resolves to the Microsoft Store stub: {which_path}\n"
+                "[AGENT GUIDANCE — PYTHON STUB DETECTED]\n"
+                "The Microsoft Store Python stub in PATH can cause silent failure in subprocesses.\n"
+                "Troubleshooting Steps:\n"
+                "1. Install Python from python.org or via winget: `winget install Python.Python.3.11`\n"
+                "2. Disable App Execution Aliases: Search Windows for 'Manage app execution aliases' and toggle off 'Python' and 'Python3'.\n"
+                "3. Update your PATH environment variable to prioritize the real Python installation."
+            )
+    return None
+
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python quick_validate.py <skill_directory>")
         sys.exit(1)
+
+    # Check interpreter
+    stub_warning = check_python_interpreter()
+    if stub_warning:
+        print(f"WARNING: {stub_warning}\n", file=sys.stderr)
 
     valid, message = validate_skill(sys.argv[1])
     print(message)
