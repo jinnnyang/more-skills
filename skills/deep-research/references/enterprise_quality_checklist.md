@@ -1,160 +1,141 @@
-# Enterprise Research Quality Checklist
+# Enterprise Research Quality Checklist (企业级研究质量与质检规范)
 
-Three-level quality control executed at each stage transition.
-
-## L1: Data Collection Quality (after each dimension)
-
-### Per-Dimension Checks
-
-| Check Item | Standard | Method | Pass Condition |
-|-----------|----------|--------|---------------|
-| Source count | Key data points ≥2 sources | Count source annotations | ≥90% compliance |
-| Source attribution | All data has source marked | Check citations in draft | ≥95% completeness |
-| Cross-validation pass rate | Data deviation ≤10% | Compare multi-source data | ≥95% validation pass |
-| Timeliness | Financial: ≤2 years; News: ≤6 months | Check timestamps | 100% compliance |
-
-**Result handling**: All pass → proceed. Partial fail → supplement sources. Critical fail → re-collect dimension.
-
-### Dimension-Specific Checklists
-
-**D1 Company Fundamentals** (target: 11/11):
-- [ ] Legal entity boundaries clarified
-- [ ] Founding date with month/year
-- [ ] Headquarters city identified
-- [ ] Founder/CEO confirmed (≥2 sources)
-- [ ] Employee count with year
-- [ ] Listing status (exchange, ticker)
-- [ ] Latest valuation/market cap with date
-- [ ] Core business one-liner
-- [ ] Funding history ≥3 rounds
-- [ ] ≥5 milestone events in timeline
-- [ ] Ownership structure: controller identified
-
-**D2 Business & Products** (target: 7/7):
-- [ ] ≥3 business segments identified
-- [ ] Revenue share per segment
-- [ ] ≥3 core products analyzed
-- [ ] User metrics (DAU/MAU) with numbers
-- [ ] Monetization model per product
-- [ ] Revenue breakdown (segment/geography/customer)
-- [ ] Growth/decline trend per segment
-
-**D3 Competitive Position** (target: 7/7):
-- [ ] Industry clearly defined
-- [ ] Market size quantified
-- [ ] Company rank established
-- [ ] Market share with number
-- [ ] ≥3 competitors identified
-- [ ] Multi-dimension comparison table complete
-- [ ] ≥5 barrier dimensions assessed with scores
-
-**D4 Financial & Operations** (target: 9/9):
-- [ ] Revenue: 3-year data
-- [ ] Net income: 3-year data
-- [ ] Gross margin: 3-year data
-- [ ] Net margin: 3-year data
-- [ ] Operating cash flow: 3-year data
-- [ ] R&D expense: 3-year data
-- [ ] Key financial data cross-validated (≥2 sources)
-- [ ] Metric definitions consistent across years
-- [ ] ≥3 efficiency metrics (ROE/ROA/etc.)
-
-**D5 Recent Developments** (target: 5/5):
-- [ ] ≥5 recent events (within 6 months)
-- [ ] Events span ≥3 event types
-- [ ] Each event has impact assessment
-- [ ] ≥2 strategic direction signals identified
-- [ ] Most recent event within 1 month
-
-**D6 Internal/Proprietary** (target: 2/2):
-- [ ] Internal knowledge base queried (or limitation noted)
-- [ ] Internal document search executed (or limitation noted)
-
-## L2: Analysis Quality (after analysis frameworks applied)
-
-| Check Item | Standard | Method | Pass Condition |
-|-----------|----------|--------|---------------|
-| SWOT completeness | Each quadrant ≥3 entries | Entry count | Full coverage |
-| SWOT evidence | Every entry has data backing | Check "Evidence" fields | 100% evidenced |
-| Risk matrix coverage | All 8 categories assessed | Category checklist | 100% covered |
-| Barrier quantification | All 7 dimensions scored | Check scorecard completeness | 100% scored |
-| Conclusion support | All conclusions trace to evidence | Trace each conclusion | 100% supported |
-
-**Result handling**: All pass → proceed to writing. Partial fail → supplement analysis evidence. Critical fail → re-execute analysis framework.
-
-## L3: Document Quality (after report drafted)
-
-| Check Item | Standard | Method | Pass Condition |
-|-----------|----------|--------|---------------|
-| Structure compliance | Follows 7-chapter template | Compare against template | ≥95% compliance |
-| Table format consistency | All tables uniformly formatted | Visual inspection | 100% uniform |
-| Readability | Paragraphs ≤450 chars; ≥3 parallel items use lists | Paragraph length check | ≥95% compliance |
-| Data annotation | All data has source + year | Citation audit | 100% complete |
-| Appendix completeness | Includes source index + glossary | Content check | 100% complete |
-
-**Result handling**: All pass → deliver. Partial fail → format optimization. Critical fail → regenerate document.
-
-## Enterprise Report Structure (7 Chapters)
-
-```
-# {Company Name} Research Report
-
-> Executive Summary: {1-2 sentence core conclusion}
+为保证企业级调研报告达到严密的商业分析标准，必须在阶段跳转时强制执行以下三级质量控制（L1/L2/L3 Quality Control）。
 
 ---
 
-## 1. Company Overview
-### 1.1 Basic Information (table)
-### 1.2 Development Timeline
-### 1.3 Funding History (table)
-### 1.4 Ownership Structure & Control
-### 1.5 Core Management Team (table)
+## L1：数据收集质量核验 (L1 Data Quality)
 
-## 2. Business & Product Structure
-### 2.1 Business Landscape Overview
-### 2.2 Core Product Matrix (table)
-### 2.3 Revenue Structure Analysis
-### 2.4 Business Development Trends
+在完成 E2 (六维度数据采集) 且写回子任务 Notes 后，主 Agent 必须逐项核对以下指标：
 
-## 3. Market & Competitive Position
-### 3.1 Industry Position Analysis
-### 3.2 Competitive Comparison (table)
-### 3.3 Competitive Barrier Assessment (scorecard)
+### 数据合格率标准
+- **信源去重度**：关键财务和业务数据点必须有至少 2 个独立信源进行交叉校验（合规率 $\ge 90\%$）。
+- **引文标注率**：正文中提到的每一个事实、数据，均需有明确的 `[n]` 注册表引文（完整率 $\ge 95\%$）。
+- **时效性达标率**：财务指标应在 2 年内，新闻动态在 6 个月内（时效合规率 $100\%$，若数据缺失，需显式标出截止时间）。
 
-## 4. Financial & Operations Analysis
-### 4.1 Key Financial Metrics (3-year comparison table)
-### 4.2 Operating Efficiency Assessment
-### 4.3 Financial Health Summary
+### 维度卡点核算清单
 
-## 5. Risks & Concerns
-### 5.1 Risk Matrix Analysis (8-category table)
-### 5.2 Key Risk Deep-Dives
-### 5.3 Risk Mitigation Recommendations
+#### D1 公司基本情况 (必须完成 $\ge 10$ 项)：
+- [ ] 明确了法律实体边界（区分母公司与子公司实体）
+- [ ] 成立时间精确到月/年
+- [ ] 总部所在地明确
+- [ ] CEO/实际控制人确认（至少 2 个信源）
+- [ ] 员工规模（附带统计截止年份）
+- [ ] 上市交易所及股票代码（未上市则标明“未上市”）
+- [ ] 最新估值或市值（附带统计日期）
+- [ ] 主营业务一句话精准描述
+- [ ] 融资历史（列出至少 3 轮重大融资或 IPO 细节）
+- [ ] 股权控制架构清晰（确认实控人及其投票权占比）
 
-## 6. Recent Developments
-### 6.1 Major Recent Events (table)
-### 6.2 Strategic Signal Interpretation
+#### D2 业务与产品分析 (必须完成 $\ge 6$ 项)：
+- [ ] 识别出至少 3 个主营业务板块
+- [ ] 各业务板块的营收占比明确
+- [ ] 识别并剖析了至少 3 款核心产品
+- [ ] 包含核心产品的运营规模数据（如用户量 DAU/MAU，或产能利用率）
+- [ ] 各产品的商业化变现模式分析清晰
+- [ ] 营收细分结构完整（包含板块/区域/客户类型的至少一种细分）
 
-## 7. Comprehensive Assessment & Conclusion
-### 7.1 SWOT Summary
-### 7.2 Comprehensive Scorecard
-### 7.3 Core Conclusions & Outlook
+#### D3 市场与竞争格局 (必须完成 $\ge 6$ 项)：
+- [ ] 明确界定了目标公司所处的垂直行业
+- [ ] 对行业整体市场规模进行定量 TAM 分析
+- [ ] 确定了目标公司的行业市场份额及排名
+- [ ] 识别出至少 3 个主要对标竞品
+- [ ] 完成了竞品多维度对比表（营收/估值/特色对比）
+- [ ] 完成了竞争壁垒量化评级与打分
+
+#### D4 财务与运营指标 (必须完成 $\ge 8$ 项)：
+- [ ] 收集了连续 3 年的营业收入数据
+- [ ] 收集了连续 3 年的净利润数据
+- [ ] 收集了连续 3 年的毛利率与净利率数据
+- [ ] 收集了连续 3 年的经营性现金流数据
+- [ ] 收集了连续 3 年的研发投入及其占营收比数据
+- [ ] 关键财务指标进行了双源交叉校验并记录偏差
+- [ ] 各年指标口径（如会计准则）保持一致
+- [ ] 计算了至少 3 个运营效率指标（如 ROE、资产负债率等）
+
+#### D5 近期动态与信号 (必须完成 $\ge 4$ 项)：
+- [ ] 收集了近 6 个月内至少 5 个重大动态事件
+- [ ] 事件覆盖了至少 3 个不同的事件类型（如产品发布、融资、高管变动、合规等）
+- [ ] 每个动态事件均附带了对目标公司的潜在影响评估
+- [ ] 识别出至少 2 个明确的战略方向信号（如全球化扩张、业务收缩等）
 
 ---
 
-## Appendices
-### A. Data Source Index
-### B. Glossary
-### C. Disclaimer
+## L2：分析质量核验 (L2 Analysis Quality)
+
+在完成 E3 ( SWOT、竞争壁垒、风险矩阵与综合得分卡) 后，主 Agent 进行自我审计：
+
+- **SWOT 关联度**：每个象限条目是否都具备前置数据支撑？（严禁凭空捏造无事实根据的优劣势）。
+- **风险覆盖度**：8 个强制风险类别是否全部评估完毕？高危风险是否给出了明确的应对动作建议？
+- **壁垒评分合理性**：7 个壁垒维度的评分是否给出了具体的文字支撑依据，且加权得分正确？
+- **结论一致性**：最终得出的战略对策是否可以直接从 SWOT 和壁垒打分中逻辑推导出来？
+
+---
+
+## L3：文档与编排质量核验 (L3 Document Quality)
+
+在报告草稿撰写完成后进行最终合规性核对：
+
+- **大纲契合度**：是否严格按照企业级 7 章节大纲结构进行撰写？
+- **数据时效一致性**：是否存在前文使用 2024 年数据，后文 SWOT 冲突使用 2023 年陈旧数据的问题？
+- **格式一致性**：所有表格是否排版整齐且列标题清晰？Mermaid 代码是否无报错且符合规范？
+- **引文一致性**：所有引文是否均在正文及参考文献注册表中有对应？是否存在 Dropped 信源复活情况？
+
+---
+
+## 7 章节企业级调研报告大纲结构 (7-Chapter Template)
+
+企业模式下的最终报告必须套用以下大纲结构：
+
+```markdown
+# {公司名称} 深度调研与分析报告
+
+> 调研日期: YYYY-MM-DD | 来源文献数: N | 报告时效截止 (AS_OF): YYYY-MM-DD | 评级: {Moat Moat} | 综合得分: {Score}
+
+## 摘要 / Executive Summary
+[对公司核心竞争优势、商业模式瓶颈、核心地缘/供应链风险及未来前景进行 300 字精炼总结。]
+
+---
+
+## 1. 公司基本概况与历史沿革 (Company Overview)
+### 1.1 基本工商信息表 (包括名称、总部、CEO、员工规模、上市状态等)
+### 1.2 发展历程与里程碑事件
+### 1.3 融资历史与主要投资方 (表格展示)
+### 1.4 股权控制架构与实际控制人分析
+
+## 2. 业务板块与产品矩阵分析 (Business & Product Structure)
+### 2.1 主营业务板块及营收占比
+### 2.2 核心产品矩阵评估 (表格对比定位、用户量及变现模式)
+### 2.3 近3年营收结构细分分析 (按地域/客户类型/产品线)
+
+## 3. 市场竞争与壁垒评估 (Market & Competitive Position)
+### 3.1 行业市场规模 (TAM) 与公司所处排名
+### 3.2 主要竞品多维对比 (表格展示)
+### 3.3 竞争壁垒量化评估评分卡 (表格展示 7 维度打分及依据)
+
+## 4. 财务状况与运营分析 (Financial & Operations Analysis)
+### 4.1 3年核心财务指标对比分析 (营业收入、净利润、毛利率、研发占比等表格)
+### 4.2 资产负债状况与运营效率 (ROE、人均产出等)
+### 4.3 财务健康度综合结论
+
+## 5. 核心潜在风险与痛点 (Risks & Concerns)
+### 5.1 8大核心风险矩阵 (概率、影响、风险值与风险色块表格)
+### 5.2 核心高危风险深度透视
+### 5.3 风险规避与缓冲建议
+
+## 6. 近期动态与战略信号 (Recent Developments)
+### 6.1 近6个月重大事件列表与影响 (表格展示)
+### 6.2 战略演变信号解读 (扩张/收缩/转型信号)
+
+## 7. SWOT 综合对策与分析结论 (Comprehensive Assessment)
+### 7.1 SWOT 分析矩阵
+### 7.2 SWOT 对策建议矩阵 (SO/WO/ST/WT)
+### 7.3 企业综合打分卡与最终调研结论
+
+---
+
+## 附录 (Appendices)
+### 附录 A. 全局文献索引 (Citations)
+### 附录 B. 缩略语与专有名词释义
+### 附录 C. 免责声明 (Disclaimer)
 ```
-
-## Quality Control Four Dimensions
-
-Apply throughout all stages:
-
-| Dimension | Focus | Key Checks |
-|-----------|-------|------------|
-| **Accuracy** | Data correctness | Source attribution, fact verification, cross-validation, error tolerance |
-| **Completeness** | Information coverage | Dimension coverage, key element presence, conclusion support, risk coverage |
-| **Timeliness** | Data currency | Data freshness, trend capture, signal detection, dynamic updates |
-| **Consistency** | Uniform standards | Metric definitions aligned, format unified, style consistent, terminology standardized |

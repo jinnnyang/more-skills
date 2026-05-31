@@ -14,7 +14,7 @@
 - **深度级别 (Depth)**：`DEEP`（深度阅读，利用 web_fetch 爬取全文）或 `SCAN`（快速扫描，基于搜索摘要）。
 - **输出路径 (Output Path)**：必须统一存放在 `findings/task-{id}.md`。
 
-*注：如果是企业调研模式，直接跳转至 [enterprise_workflow.md](file:///c:/Users/jinnn/Documents/more-skills/skills/deep-research/references/enterprise_workflow.md) 获取专属的六维度任务看板。*
+*注：如果是企业调研模式，直接跳转至 [enterprise_workflow.md](../enterprise_workflow.md) 获取专属的六维度任务看板。*
 
 ---
 

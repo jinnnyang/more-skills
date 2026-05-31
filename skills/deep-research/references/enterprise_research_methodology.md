@@ -1,164 +1,105 @@
-# Enterprise Research Methodology
+# Enterprise Research Methodology (企业级调研收集方法论)
 
-## Six-Dimension Data Collection
+当进入企业调研模式时，必须按照本指南对目标实体展开深入的数据收集。
 
-Enterprise research requires parallel collection across six dimensions. Execute all six in order, writing findings to a structured draft after each dimension.
+---
 
-### Dimension 1: Company Fundamentals
+## 1. 六维度数据采集流程 (Six-Dimension Collection)
 
-```
-Step 1.1: Confirm legal entity
-├── Clarify parent/subsidiary/affiliate boundaries
-├── Query: "{company} legal entity corporate structure"
-├── Output: Entity scope statement
-└── Verify: Map operating entities to brands
+企业调研要求在六个维度上进行并行与深入的检索。在各维度数据收集完成后，将提炼的 Findings 写入对应的任务 Notes 文件中。
 
-Step 1.2: Basic information
-├── Query round 1: "{company} founding date headquarters founder"
-├── Query round 2: "{company} company overview profile"
-├── Query round 3: "{company} CEO management team executives"
-├── Source priority: Official site > Regulatory filings > Authoritative media
-└── Output: Basic info table (name, founded, HQ, CEO, employees, listing status)
+### 维度 1：公司基本情况 (Company Fundamentals - Task A)
+1. **法定实体确认**：
+   - 厘清母公司、子公司与联营企业的边界。
+   - 检索词示例：`"{公司名称} 股权结构 关联公司 法定代表人"`
+   - 输出：公司边界范围界定说明。
+2. **工商与基本信息**：
+   - 检索词示例：`"{公司名称} 成立日期 总部 创始人 执行官"`
+   - 信源优先级：官方网站 > 监管文件 (如 SEC 申报) > 权威媒体。
+   - 输出：基本信息表（包含法定名称、成立时间、总部所在地、CEO、员工规模、上市状态）。
+3. **融资历史**：
+   - 检索词示例：`"{公司名称} 融资轮次 估值 IPO"`
+   - 输出：融资历史时间线表格（包含轮次、融资金额、领投/跟投机构、投后估值、日期）。
+4. **股权结构与实际控制权**：
+   - 检索词示例：`"{公司名称} 股权结构 实际控制人 投票权占比"`
+   - 输出：控制权结构总结（分析是否存在双重股权等控制机制）。
 
-Step 1.3: Funding history
-├── Query: "{company} funding rounds valuation IPO"
-├── Key fields: round, amount, investors, post-money valuation, date
-└── Output: Funding timeline table
+### 维度 2：业务与产品分析 (Business & Products - Task B)
+1. **业务板块扫描**：
+   - 检索词示例：`"{公司名称} 主营业务 板块 营收构成"`
+   - 输出：主营业务板块表（板块名称、定位、营收占比、YoY 同比增速）。
+2. **核心产品矩阵**：
+   - 检索词示例：`"{核心产品名称} DAU MAU 用户规模 市场份额"`
+   - 输出：产品矩阵表（产品定位、目标受众、用户规模、盈利模式、竞争优势）。
+3. **营收结构细分**：
+   - 数据源：财务报告（深度提炼）。
+   - 输出：营收结构分析（按板块、地理区域、客户类型及收费模式细分）。
 
-Step 1.4: Ownership structure
-├── Query: "{company} ownership structure beneficial owner"
-├── Key fields: controller identity, economic interest %, voting rights %, control mechanisms (dual-class etc.)
-└── Output: Ownership summary
-```
+### 维度 3：市场与竞争格局 (Competitive Position - Task C)
+1. **行业地位分析**：
+   - 检索词示例：`"{行业名称} 市场规模 行业排名 集中度 CR3"`
+   - 输出：行业地位分析（TAM/SAM/SOM 市场规模及目标公司排名）。
+2. **竞品识别与多维对比**：
+   - 检索词示例：`"{公司名称} 竞品 对标 区别"`
+   - 输出：竞争对比表（至少包含 3 个主要竞品，对比成立时间、营收、估值、产品特色、优劣势）。
+3. **竞争壁垒评估**：
+   - 参见 [enterprise_analysis_frameworks.md](enterprise_analysis_frameworks.md) 的壁垒打分模型。
+   - 输出：包含得分与详尽依据的壁垒评分卡。
 
-### Dimension 2: Business & Products
+### 维度 4：财务与运营指标 (Financial & Operations - Task D)
+1. **核心财务数据收集**：
+   - 检索词示例：`"{公司名称} 财务业绩 营业收入 净利润 R&D研发投入"`
+   - 核心指标（至少 3 年数据）：营业收入、营收增速、净利润、毛利率、净利率、经营性现金流、研发支出、研发占比。
+   - 输出：3年核心财务数据对比表。
+2. **运营效率评估**：
+   - 检索词示例：`"{公司名称} ROE ROA 人均产出 资产负债率"`
+   - 输出：运营效率指标表。
+3. **财务交叉校验**：
+   - 核心数据必须有至少 2 个独立来源进行校验，记录数据偏差并给出解释。
 
-```
-Step 2.1: Business landscape scan
-├── Query round 1: "{company} product lines business segments"
-├── Query round 2: "{company} revenue breakdown by segment"
-├── Query round 3: "{company} business model monetization"
-├── Key fields: segment name, positioning, revenue share, YoY growth, synergies
-└── Output: Business landscape table
+### 维度 5：最新动态与战略信号 (Recent Developments - Task E)
+1. **近期动态扫描 (近 6 个月)**：
+   - 检索词示例：`"{公司名称} 最新动态 新闻 {当前年份} 战略调整 人事变动"`
+   - 覆盖事件：产品发布、融资/资本运作、战略转向、高管变动、合规/诉讼。
+   - 数量要求：至少收集 5 个重大事件。
+   - 输出：重大动态列表。
+2. **战略信号解读**：
+   - 输出：扩张信号、收缩信号、转型信号及地缘合规等风险信号的解读。
 
-Step 2.2: Core product analysis
-├── Query: "{company} core products DAU MAU user base"
-├── Per product: positioning, target users, scale (DAU/MAU), market share, monetization, competitive advantage, trends
-└── Output: Product matrix table
+### 维度 6：内部与专属信源 (Internal/Proprietary Sources - Task F)
+1. **专属授权信源检索**：
+   - 若用户提供了专有订阅源（如 Crunchbase Pro 导出数据），需作为 Task F 的主力输入，并在引文中标记为 `exclusive-user-provided`。
+2. **无专属信源时的回落**：
+   - 若无，必须在看板中明确记录：“无内部/专有信源，回落至公共网络深度检索”，并在报告中予以披露说明。
 
-Step 2.3: Revenue structure analysis
-├── Source: Financial reports (deep extraction)
-├── Breakdown by: segment, geography, customer type, pricing model
-└── Output: Revenue structure summary
-```
+---
 
-### Dimension 3: Competitive Position
+## 2. 信源优先级矩阵 (Data Source Priority Matrix)
 
-```
-Step 3.1: Industry position
-├── Query: "{company} industry ranking market share"
-├── Key fields: industry definition, TAM/SAM/SOM, company rank, share, concentration (CR3/CR5)
-└── Output: Industry position analysis
+| 优先级 | 信源类型 | 可信度分值 | 时效性 | 主要应用场景 |
+|:---:|---|:---:|:---:|---|
+| **P0** | 官方财报 / 招股书 / 审计报告 | 10/10 | 高 | 财务数据、股权结构、基本工商信息 |
+| **P0** | 公司官网 / 官方公告 | 10/10 | 高 | 基本资料、重大新闻、高管团队 |
+| **P1** | 监管机构公示 (如证监会、工商局) | 9/10 | 高 | 资质许可、行政处罚、法律诉讼 |
+| **P1** | 权威行业分析报告 (如 Gartner, IDC) | 9/10 | 中 | 市场地位、行业份额、 TAM 预测 |
+| **P2** | 主流财经媒体 (如 财新、华尔街日报) | 8/10 | 高 | 近期事件、舆论评价、战略传言 |
+| **P2** | 专业研究机构 / 高校学术论文 | 8/10 | 中 | 技术路线评估、产业链深度解析 |
+| **P3** | 社群媒体 / 论坛讨论 (如 Github, V2EX) | 5/10 | 高 | 用户口碑反馈、开发人员情绪（仅作参考） |
 
-Step 3.2: Competitor identification & comparison
-├── Query round 1: "{company} competitors"
-├── Query round 2: "{company} vs {competitor A} comparison"
-├── Query round 3: "{company} vs {competitor B} differences"
-├── Comparison dimensions: founding, revenue, market share, core products, user scale, valuation/market cap, strengths, weaknesses
-├── Minimum: ≥3 competitors identified
-└── Output: Competitive comparison table
+---
 
-Step 3.3: Competitive barriers assessment
-├── Use quantified barrier framework (see enterprise_analysis_frameworks.md)
-├── 7 dimensions: network effects, scale economies, brand, technology/patents, switching costs, regulatory licenses, data assets
-└── Output: Barrier scorecard with rating
-```
+## 3. 数据交叉校验准则 (Cross-Validation Rules)
 
-### Dimension 4: Financial & Operations
+| 数据类型 | 最少信源数 | 最大允许偏差 | 主力信源 | 备用信源 |
+|---|:---:|:---:|---|---|
+| **财务数据** | 2 | 10% | 官方财务报告 | 监管机构披露、行业研报 |
+| **市场份额** | 2 | 15% | 权威第三方分析报告 | 公司官方宣称、竞品财报推算 |
+| **高管/工商资料** | 1 | N/A | 官方公示/企查查 | 媒体报道、社交账号 |
+| **用户/产品运营指标** | 2 | 20% | 公司披露的运营快报 | 第三方监控平台数据、行业研报 |
 
-```
-Step 4.1: Financial data collection
-├── Query: "{company} financial results {year} revenue profit"
-├── Core metrics (3-year minimum): revenue, revenue growth, net income, gross margin, net margin, operating cash flow, R&D expense, R&D ratio
-└── Output: Financial metrics table (3+ years)
+---
 
-Step 4.2: Operating efficiency analysis
-├── Query: "{company} ROE ROA efficiency per-employee"
-├── Efficiency metrics: ROE, ROA, revenue per employee, accounts receivable days, debt-to-equity
-└── Output: Operating efficiency table
-
-Step 4.3: Cross-validation
-├── Require ≥2 independent sources for key financial data
-├── Sources: company filings (primary), regulatory filings, authoritative financial data providers
-├── Deviation rules:
-│   ├── ≤10%: Pass
-│   ├── 10-20%: Flag with explanation
-│   └── >20%: Require third-party verification
-└── Output: Validation record
-```
-
-### Dimension 5: Recent Developments
-
-```
-Step 5.1: Recent news scan (past 6 months)
-├── Query round 1: "{company} latest news {current year}"
-├── Query round 2: "{company} strategy pivot latest developments"
-├── Query round 3: "{company} executive changes leadership"
-├── Query round 4: "{company} partnership acquisition latest"
-├── Query round 5: "{company} product launch new release"
-├── Event types: product launches, fundraising/capital, strategy shifts, executive changes, M&A/partnerships, regulatory/compliance
-├── Minimum: ≥5 events identified
-└── Output: Major events table
-
-Step 5.2: Strategic signal interpretation
-├── Dimensions: expansion signals, contraction signals, transformation signals, risk signals
-└── Output: Strategic signal analysis
-```
-
-### Dimension 6: Internal/Proprietary Sources
-
-```
-Step 6.1: Internal knowledge base query (if available)
-├── Query 1: "our company's relationship with {target company}"
-├── Query 2: "internal assessment of {target company}"
-├── Query 3: "{target company} competitive analysis"
-├── Query 4: "{target company} industry research"
-└── Output: Internal perspective supplementary info
-
-Step 6.2: If no internal sources available
-├── State explicitly: "No internal/proprietary sources available for this research"
-├── Compensate with additional public source depth
-└── Note limitation in final report
-```
-
-## Data Source Priority Matrix
-
-| Priority | Source Type | Reliability | Timeliness | Use Case |
-|----------|-----------|-------------|------------|----------|
-| **P0** | Official filings / annual reports | 10/10 | High | Core financial data |
-| **P0** | Company website / announcements | 10/10 | High | Basic info, updates |
-| **P1** | Regulatory filings | 9/10 | High | Ownership, licenses |
-| **P1** | Authoritative industry reports | 9/10 | Medium | Market position, trends |
-| **P2** | Mainstream financial media | 8/10 | High | News, analysis |
-| **P2** | Professional research institutions | 8/10 | Medium | Deep analysis, forecasts |
-| **P3** | Social media / forums | 5/10 | High | Sentiment signals only |
-
-**Rule**: P0 + P1 are primary sources. P2 for validation. P3 for reference only, never as sole source.
-
-## Cross-Validation Rules
-
-| Data Type | Min Sources | Max Deviation | Primary Source | Fallback Sources |
-|-----------|------------|---------------|----------------|-----------------|
-| Financial data | 2 | 10% | Official financial reports | Regulatory filings, analyst reports |
-| Market share | 2 | 15% | Industry reports | Company disclosures, third-party analysis |
-| Management info | 1 | N/A | Company official sources | Regulatory filings, reputable media |
-| User metrics | 2 | 20% | Company disclosures | Third-party analytics, industry reports |
-
-## Search Strategy Best Practices
-
-1. **Multi-angle queries**: 3 different query angles per topic
-2. **Time filtering**: Prioritize data within last 12 months for operational data, last 3 years for financial trends
-3. **Site restriction**: Use `site:` for authoritative domains when possible
-4. **Language diversity**: Query in both English and the company's primary language
-5. **Exclude noise**: Use `-` to exclude irrelevant results
-6. **Progressive depth**: Start broad, then narrow based on gaps identified
+## 4. 检索最佳实践 (Search Strategy)
+1. **多维度检索词**：针对同一个财务或业务事实，从 3 个不同的侧面进行组合查询，避免信息偏听。
+2. **精准过滤**：充分使用 `site:` 及 `-`（排除词）语法过滤广告和无关冗余信息。
+3. **双语覆盖**：如果是跨国企业或涉外业务，必须使用中英双语交叉搜索。

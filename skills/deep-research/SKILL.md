@@ -22,57 +22,59 @@ Lead Agent (主路由入口 — 最小化上下文占用)
   │    └── 初始化 KANBAN.md 看板与 Git 仓库
   │
   ├── [P1] 调研任务分解与规划 ──→ 载入 references/phases/p1_taskboard.md
-  │    └── [Git 自动提交]: stage: plan-initialized
+  │    └── 📌 [Git 自动提交 1/3]: stage: plan-initialized
   │
-  ├── [P2] 子任务分发与抓取 (Lead/Subagents) ──→ 写入 findings/task-*.md
-  │    └── [Git 自动提交]: stage: research-notes-completed
+  ├── [P2] 子任务分发与抓取 (Lead/Subagents) ──→ 载入 references/phases/p2_dispatch.md
+  │    └── 提炼并写入 findings/task-*.md 笔记 (严格控制 Token 密度)
   │
   ├── [P3] 文献引文清洗与图表规划 ──→ 载入 references/phases/p3_wash_governance.md
   │    └── 进行引文排重，审计 Alt 描述，并执行绘图工具发现
   │
-  ├── [P4] 报告大纲设计与绘图规划 ──→ 登记至 KANBAN.md 报告写作进度列表
+  ├── [P4] 报告大纲设计与绘图规划 ──→ 载入 references/phases/p4_outline.md
+  │    └── 登记至 KANBAN.md 报告章节写作进度列表，规划数据可视化
   │
   ├── [P5] 分章节顺序生成与追加拼接 ──→ 载入 references/phases/p5_drafting_append.md
-  │    └── [Git 自动提交]: stage: draft-report-written
+  │    └── 📌 [Git 自动提交 2/3]: stage: draft-report-written
   │
   ├── [P6] 反方立场审查与纠错 (Counter-Review) ──→ 载入 references/phases/p6_p7_review_verify.md
+  │    └── 对正文核心观点进行对立立场自我审查，查找至少 3 个问题
   │
   └── [P7] 对账复核、README 更新与归档封版 ──→ 载入 references/phases/p6_p7_review_verify.md
-       └── [Git 自动提交]: stage: report-finalized
+       └── 📌 [Git 自动提交 3/3]: stage: report-finalized
 ```
 
 ---
 
-## 🔀 双轨路由分支 (Workflow Branching)
+## 🔀 双轨路由与模式叠加 (Workflow Overlay)
+
 启动 Intake 确认后，根据调研类型执行条件分发：
 - **企业/机构调研模式 (Enterprise Research Mode)**：
-  - 触发条件：调研目标为单一特定企业或具体商业实体。
-  - 路由动作：直接跳转并完全遵循 [enterprise_workflow.md](file:///c:/Users/jinnn/Documents/more-skills/skills/deep-research/references/enterprise_workflow.md) 指令包，进行六维度深度采集与 SWOT 矩阵、竞争壁垒评分。
+  - **触发条件**：调研目标为单一特定企业或具体商业实体。
+  - **叠加规则**：企业模式是 P0-P7 主生命周期的**“专业配置叠加（Overlay）”**。执行时继续遵循主生命周期各个阶段，但进入对应阶段时，必须载入并完全执行 [enterprise_workflow.md](references/enterprise_workflow.md) 所规定的六维度数据抓取（E2）、SWOT与壁垒评分（E3）、三级质检（E4）及7章节企业报告模板（E5）。
 - **通用专题调研模式 (General Research Mode)**：
-  - 触发条件：调研目标为行业趋势、宏观政策、技术选型或科普综述。
-  - 路由动作：顺序执行 `P0` 到 `P7` 指令。
+  - **触发条件**：调研目标为行业趋势、宏观政策、技术选型或科普综述。
+  - **路由动作**：顺序执行通用版 `P0` 到 `P7` 指令。
 
 ---
 
 ## 🚀 执行核心原则 (Core Execution Principles)
 
-1. **按需加载 (Lazy Loading)**：禁止在 P0-P2 阶段一次性读取全部 P5-P7 参考文件。仅在转换至新阶段时，才通过点击链接读取对应文件。
-2. **Markdown 看板优先**：项目状态一律登记于项目根目录下的 `kanban/KANBAN.md` 中。断电中断后重启时，先读取该看板进行断点状态机恢复。
+1. **按需加载 (Lazy Loading)**：仅在转换至新阶段时，才通过点击相对路径链接读取对应参考文件。禁止提前载入无关阶段的指导文件。
+2. **Markdown 看板优先**：项目进度与待写章节一律登记于项目根目录下的 `kanban/KANBAN.md` 中。断电中断后重启时，先读取该看板进行断点状态机恢复。
 3. **流式分段追加**：大文本生成（P5）必须以 Section 为单位逐章流式追加写入 `report.md`，单章节控制在 400-800 字，释放历史废弃上下文以防截断。
-4. **轻量 Git 提交**：
+4. **非阻断式 Git 提交**：
    - 自动提交在 Git CLI 可用时静默运行；若 Git 不存在，则打印 warning 日志直接跳过，**严禁报错阻断**。
-   - 仅在以下三个主生命周期节点自动执行 Git 提交：
-     - P1 任务板完成：`git commit -m "stage: plan-initialized"`
-     - P5 报告初稿完成：`git commit -m "stage: draft-report-written"`
-     - P7 最终归档发布：`git commit -m "stage: report-finalized"`
+   - 严格限制 Git 提交频次为上述 **3 个核心阶段节点**，禁止在中间章节写入或子代理 Notes 抓取时频繁提交。
 
 ---
 
 ## 📁 核心阶段子指令清单 (Reference Guides)
 
-- **环境、Intake与目录初始化**: [p0_setup.md](file:///c:/Users/jinnn/Documents/more-skills/skills/deep-research/references/phases/p0_setup.md) (P0)
-- **任务分解与大纲看板**: [p1_taskboard.md](file:///c:/Users/jinnn/Documents/more-skills/skills/deep-research/references/phases/p1_taskboard.md) (P1)
-- **文献清洗与绘图发现**: [p3_wash_governance.md](file:///c:/Users/jinnn/Documents/more-skills/skills/deep-research/references/phases/p3_wash_governance.md) (P3)
-- **分章节流式写作与断点恢复**: [p5_drafting_append.md](file:///c:/Users/jinnn/Documents/more-skills/skills/deep-research/references/phases/p5_drafting_append.md) (P5)
-- **反方纠错与对账发布**: [p6_p7_review_verify.md](file:///c:/Users/jinnn/Documents/more-skills/skills/deep-research/references/phases/p6_p7_review_verify.md) (P6-P7)
-- **企业模式专属工作流**: [enterprise_workflow.md](file:///c:/Users/jinnn/Documents/more-skills/skills/deep-research/references/enterprise_workflow.md)
+- **[P0] 环境、Intake与目录初始化**: [p0_setup.md](references/phases/p0_setup.md)
+- **[P1] 任务分解与大纲看板**: [p1_taskboard.md](references/phases/p1_taskboard.md)
+- **[P2] 子任务分发与笔记限制**: [p2_dispatch.md](references/phases/p2_dispatch.md)
+- **[P3] 文献清洗与绘图发现**: [p3_wash_governance.md](references/phases/p3_wash_governance.md)
+- **[P4] 大纲映射与可视化规划**: [p4_outline.md](references/phases/p4_outline.md)
+- **[P5] 分章节流式写作与断点恢复**: [p5_drafting_append.md](references/phases/p5_drafting_append.md)
+- **[P6/P7] 反方纠错与对账归档**: [p6_p7_review_verify.md](references/phases/p6_p7_review_verify.md)
+- **[Enterprise] 企业模式叠加工作流**: [enterprise_workflow.md](references/enterprise_workflow.md)

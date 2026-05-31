@@ -1,65 +1,73 @@
-# Enterprise Research Workflow (企业级调研专属工作流)
+# Enterprise Research Workflow (企业级调研专业叠加工作流)
 
-当启动企业/机构调研模式时，主智能体（Lead Agent）必须完全遵循本工作流指令，进行六维度数据收集、量化分析框架应用及三级质量管控。
+企业/机构调研模式并不是脱离 `deep-research` 主生命周期的独立并轨流程，而是作为主生命周期（P0 到 P7 阶段）在特定数据源、规划、分析框架和质检标准上的**“专业配置叠加（Overlay）”**。
 
----
-
-## E1: 需求吸纳与定义 (Intake)
-在启动确认阶段，额外明确以下信息：
-1. 确认具体的法律实体名称（区分母公司与子公司）。
-2. 选择调研深度：快速扫描（3-5页）/ 标准版（10-20页） / 深度调研（20-40页）。
-3. 指定对标或竞争企业列表。
+在 Intake 确认启动企业模式后，主智能体（Lead Agent）在执行主干生命周期时，必须无缝叠加本工作流中所载的各项细则。
 
 ---
 
-## E2: 六维度数据采集 (Six Dimensions)
-Lead Agent 规划 6 个专门的任务（对应 Task A 到 Task F），并下发收集：
-- **D1：公司基础 (Fundamentals)**：法定实体、历史演变、融资与所有权结构。
-- **D2：业务与产品 (Business & Products)**：营收板块构成、主打产品、供应链上下游、营收结构。
-- **D3：市场与竞争 (Competitive Position)**：市场份额与行业排名、核心竞争壁垒、专利与技术研发优势。
-- **D4：财务与运营 (Financial & Operations)**：近3年财务核心数据、资产状况、核心运营效率指标。
-- **D5：最新进展 (Recent Developments)**：近 6 个月的重大事件、合规摩擦与战略信号。
-- **D6：专属/敏感信源 (Exclusive/Internal Sources)**：核实用户提供的私有数据（如 Crunchbase Pro 导出数据），若无则标注“无外部专有信源”。
+## 🧭 主生命周期叠加映射关系 (Lifecycle Overlay Mapping)
+
+```
+[P0: Setup] ──→ 额外明确法律实体、调研深度及对标企业 (Intake)
+     │
+[P1: Taskboard] ──→ 任务分解严格对应【六维度数据采集】(Task A 到 Task F)
+     │
+[P2: Dispatch] ──→ 调用 subagent_prompt 进行检索，遵循【数据采集方法论】
+     │              └── 📚 关联参考：enterprise_research_methodology.md
+     │
+[P3: Wash] ──→ 执行全局引文注册与清洗，进行多源数据交叉校验
+     │
+[P4: Outline] ──→ 规划 7 章节企业大纲，并启动【量化分析框架】计算
+     │              └── 📚 关联参考：enterprise_analysis_frameworks.md
+     │
+[P5: Drafting] ──→ 按 7 章节大纲循环生成与分段追加写入，执行 L1/L2 质检
+     │              └── 📚 关联参考：enterprise_quality_checklist.md
+     │
+[P6: Review] ──→ 执行 Manual Counter-Review 反方审查与 L3 格式质检
+     │
+[P7: Verify] ──→ 对账复核、更新 README 并执行归档 Git 提交
+```
 
 ---
 
-## E3: 量化分析框架 (Analysis Frameworks)
-对上述数据整合清洗后，必须输出以下四个规范化的分析板块：
-
-### 1. SWOT 综合分析矩阵
-每个象限（S/W/O/T）包含 3-5 个条目，每个条目必须附带客观的数据支撑与 Citations 编号。
-- S (优势): 内部研发占比及市场地位 [1]。
-- W (劣势): 对单一原材料的依赖及供应链瓶颈 [2]。
-- O (机会): 新兴市场爆发及替代技术突破 [3]。
-- T (威胁): 出口管制加剧及合规合规成本飙升 [4]。
-
-### 2. 竞争壁垒量化评级
-针对以下 7 个维度进行加权评分，打出综合评级（A+/A/B+/B/C+/C）：
-- **研发与技术壁垒** | **资本支出与规模壁垒** | **资质与许可准入壁垒** | **供应链排他壁垒** | **客户迁移与转换成本** | **品牌与渠道壁垒** | **网络与数据壁垒**。
-
-### 3. 风险评估矩阵 (Risk Matrix)
-评估 8 个维度的潜在风险（财务、合规、地缘、供应链、技术迭代等），打出概率与影响得分（1-5分），划分为红/黄/绿三色风险区。
-
-### 4. 企业核心得分卡 (Scorecard)
-六维度赋权打分，输出最终的百分制综合得分。
+## E1: 需求定义叠加 (Intake - P0)
+在 P0 确认阶段，主代理需要额外向用户以选择题形式明确：
+1. **确切法律实体范围**：明确是调研集团母公司，还是特定子公司或关联实体。
+2. **调研报告目标深度**：快速扫描（3-5页，对标 Lightweight）/ 标准版（10-20页，对标 Standard） / 深度剖析（20-40页，对标 Deep）。
+3. **指定竞争对标实体**：指定 1-3 个竞争对手或标杆公司进行对比。
 
 ---
 
-## E4: 三级质量管控 (Quality Control)
-在撰写报告草稿前，主 Agent 执行以下检查：
-- **L1 (数据校验)**：信源Timeliness审计、去重审计、多源校验核对。
-- **L2 (分析校验)**：SWOT 数据相关性校验、壁垒打分依据复核、风险覆盖度复核。
-- **L3 (文档校验)**：版式结构、相对多媒体 URL 格式、Mermaid 代码规范核查。
+## E2: 六维度任务规划叠加 (Six Dimensions - P1/P2)
+在 P1 阶段的任务分解和 P2 阶段的分发执行中，任务规划必须完全映射到以下六个核心收集维度，并装载子代理 Prompt 进行检索。
+具体检索词设计、优先级矩阵及交叉校验原则，必须遵循并执行：
+- **📚 阶段收集指南**：[enterprise_research_methodology.md](enterprise_research_methodology.md)
+  - *D1：公司基础情况 (Company Fundamentals - Task A)*
+  - *D2：业务与产品分析 (Business & Products - Task B)*
+  - *D3：市场与竞争格局 (Competitive Position - Task C)*
+  - *D4：财务与运营指标 (Financial & Operations - Task D)*
+  - *D5：最新动态与战略信号 (Recent Developments - Task E)*
+  - *D6：专属/敏感信源审计 (Exclusive/Internal Sources - Task F)*
 
 ---
 
-## E5: 企业级调研报告模板 (7-Chapter Template)
-草稿撰写（P5）必须遵循以下 7 章节大纲结构进行分章节追加：
-1. **公司概况与基本信息 (Company Overview)**
-2. **产品板块与营收结构分析 (Business & Product Structure)**
-3. **市场竞争与壁垒评估 (Market & Competitive Position)**
-4. **财务状况与运营分析 (Financial & Operations Analysis)**
-5. **核心潜在风险与痛点 (Risks & Concerns)**
-6. **近六个月动态与战略信号 (Recent Developments)**
-7. **综合评估与调研结论 (Comprehensive Assessment & Conclusion)**
-- 附录：引文注册表、缩略语对照表。
+## E3: 分析框架与计算叠加 (Analysis Frameworks - P3/P4)
+在 P3 文献清洗与 P4 大纲设计阶段，主代理在完成引文梳理后，必须在撰写前启动量化分析框架的推导。大纲设计必须预留出这四个量化框架的展示章节。
+具体 SWOT 对策、Moat 壁垒加权打分表、风险级别计算规则，必须遵循并执行：
+- **📚 量化计算指南**：[enterprise_analysis_frameworks.md](enterprise_analysis_frameworks.md)
+  - * SWOT 综合分析与战略对策矩阵 (SO/WO/ST/WT)*
+  - * 竞争壁垒量化评分模型 (7维度加权评级 A+ 至 C)*
+  - * 8 大关键风险类别评估矩阵 (概率 × 影响)*
+  - * 企业核心加权得分卡 (Scorecard)*
+
+---
+
+## E4: 质量卡点与模板写作叠加 (Quality Gates & Template - P5/P6/P7)
+在 P5 追加写作与 P6 反方审查中，主 Agent 必须强制套用专门的“企业级 7 章节大纲模板”进行章节流式循环撰写，并严格按照 L1 数据级、L2 分析级、L3 文档级的三级质检标准进行逐级卡点放行。
+具体质检 Checklist 及各章节二级小节要求，必须遵循并执行：
+- **📚 质检与大纲规范**：[enterprise_quality_checklist.md](enterprise_quality_checklist.md)
+  - * L1 数据收集质量核验卡点*
+  - * L2 分析质量核验卡点*
+  - * L3 文档编排与可读性质量核验卡点*
+  - * 7 章节企业级调研报告模板大纲规范*

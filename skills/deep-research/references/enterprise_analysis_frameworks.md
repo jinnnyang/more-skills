@@ -1,135 +1,112 @@
-# Enterprise Analysis Frameworks
+# Enterprise Analysis Frameworks (企业级研究分析框架)
 
-Apply these frameworks after completing the six-dimension data collection. Execute in order: SWOT → Competitive Barriers → Risk Matrix → Comprehensive Scoring.
+在完成六维度数据采集后，主智能体（Lead Agent）必须依次执行以下四个量化分析框架，以便对目标企业进行深度剖析。
 
-## SWOT Analysis Template
+---
 
-Each SWOT entry MUST include evidence and source attribution.
+## 1. SWOT 综合分析矩阵
 
-```
-|              | Positive Factors                  | Negative Factors                  |
-|--------------|-----------------------------------|-----------------------------------|
-| **Internal** | **S (Strengths)**                 | **W (Weaknesses)**                |
-|              | 1. {description}                  | 1. {description}                  |
-|              |    • Evidence: {data/fact}        |    • Evidence: {data/fact}        |
-|              |    • Source: {citation}           |    • Source: {citation}           |
-|              |    • Impact: {assessment}         |    • Impact: {assessment}         |
-|              |                                   |                                   |
-| **External** | **O (Opportunities)**             | **T (Threats)**                   |
-|              | 1. {description}                  | 1. {description}                  |
-|              |    • Evidence: {trend/policy}     |    • Evidence: {pressure/risk}    |
-|              |    • Source: {citation}           |    • Source: {citation}           |
-|              |    • Probability: {assessment}    |    • Probability: {assessment}    |
-|              |    • Impact: {assessment}         |    • Impact: {assessment}         |
-```
-
-**Requirements**:
-- Each quadrant: 3-5 entries minimum
-- Every entry must have evidence with source
-- S/W must be data-backed (not opinions)
-- O/T must include probability and impact estimates
-
-**Strategic Implications Matrix** (generate after SWOT):
-- **SO Strategy** (leverage strengths to capture opportunities): 1-2 specific recommendations
-- **WO Strategy** (overcome weaknesses to seize opportunities): 1-2 specific recommendations
-- **ST Strategy** (use strengths to counter threats): 1-2 specific recommendations
-- **WT Strategy** (mitigate weaknesses to avoid threats): 1-2 specific recommendations
-
-## Competitive Barrier Quantification Framework
-
-7 barrier dimensions with weighted scoring:
-
-| Dimension | Weight | Strong | Moderate | Weak |
-|-----------|--------|--------|----------|------|
-| **Network Effects** | 20% | 4.5 — Clear network effects (social platforms, marketplaces) | 3.0 — Exists but replaceable | 1.5 — Minimal network effects |
-| **Scale Economies** | 15% | 4.0 — Unit cost drops 30%+ with scale | 2.5 — Cost drops 10-30% | 1.0 — Cost drops <10% |
-| **Brand Value** | 15% | 4.0 — Category leader, high pricing power | 2.5 — Known brand, competitive | 1.0 — Commodity brand, price-sensitive |
-| **Technology/Patents** | 15% | 4.0 — Core patents, hard to circumvent | 2.5 — Some patent protection | 1.0 — Peripheral patents only |
-| **Switching Costs** | 15% | 4.0 — High lock-in (data, ecosystem) | 2.5 — Moderate switching friction | 1.0 — Low switching cost |
-| **Regulatory Licenses** | 10% | 3.5 — Heavy regulation, hard to obtain | 2.0 — Standard regulatory requirements | 0.5 — Light regulation |
-| **Data Assets** | 10% | 3.5 — Massive proprietary high-quality data | 2.0 — Some data accumulation | 0.5 — Limited or public data |
-
-**Scoring**: Total = Σ(dimension score × weight)
-
-**Rating Scale**:
-| Score | Rating | Interpretation |
-|-------|--------|---------------|
-| ≥3.5 | A+ | Exceptional moat |
-| ≥2.8 | A | Strong moat |
-| ≥2.0 | B+ | Good moat |
-| ≥1.5 | B | Moderate moat |
-| ≥1.0 | C+ | Limited moat |
-| <1.0 | C | Weak moat |
-
-**Output format**: Present a scorecard table with each dimension's strength rating, raw score, justification (with evidence), and the weighted total with final rating.
-
-## Risk Matrix Framework
-
-Assess 8 mandatory risk categories:
-
-### Risk Assessment Scales
-
-**Probability**:
-| Level | Range | Score |
-|-------|-------|-------|
-| High | >70% | 0.7-1.0 |
-| Medium | 30-70% | 0.3-0.7 |
-| Low | <30% | 0.0-0.3 |
-
-**Impact**:
-| Level | Description | Score |
-|-------|-------------|-------|
-| High | >30% revenue impact | 3 |
-| Medium | 10-30% revenue impact | 2 |
-| Low | <10% revenue impact | 1 |
-
-**Risk Level**: Risk Value = Probability Score × Impact Score
-| Color | Level | Threshold |
-|-------|-------|-----------|
-| Red | High risk | ≥2.5 |
-| Yellow | Medium risk | 1.0 – 2.5 |
-| Green | Low risk | <1.0 |
-
-### 8 Mandatory Risk Categories
-
-| # | Category | Typical Triggers |
-|---|----------|-----------------|
-| 1 | Market risk | Industry slowdown, demand shifts |
-| 2 | Competitive risk | New entrants, incumbents pivoting |
-| 3 | Technology risk | Tech obsolescence, disruption |
-| 4 | Regulatory risk | Policy tightening, compliance cost |
-| 5 | Financial risk | Cash flow stress, debt levels |
-| 6 | Operational risk | Key talent loss, supply chain |
-| 7 | Talent risk | Brain drain, recruiting difficulty |
-| 8 | Geopolitical risk | Trade friction, data localization |
-
-### Risk Table Format
-
-| Category | Specific Risk | Probability | Impact | Risk Value | Level | Evidence/Triggers | Current Mitigations | Recommended Actions |
-|----------|--------------|-------------|--------|------------|-------|-------------------|--------------------|--------------------|
-
-**Requirements**:
-- All 8 categories must be assessed (no skipping)
-- Each risk entry must cite specific evidence or triggers
-- Provide current mitigations AND recommended actions
-- High risks: require immediate action plans
-- Medium risks: require monitoring plans
-- Low risks: require periodic review schedule
-
-## Comprehensive Scoring (Final Section)
-
-After completing SWOT, barriers, and risk matrix, generate a comprehensive scorecard:
+SWOT 矩阵的每一个象限条目必须严格关联事实证据并标明引文来源。
 
 ```
-| Dimension | Score | Weight | Weighted | Key Evidence |
-|-----------|-------|--------|----------|-------------|
-| Business Quality | X/10 | 25% | | |
-| Competitive Position | X/10 | 20% | | |
-| Financial Health | X/10 | 20% | | |
-| Growth Potential | X/10 | 15% | | |
-| Risk Profile | X/10 | 10% | | |
-| Management Quality | X/10 | 10% | | |
-| **Total** | | 100% | **X/10** | |
+|             | 积极因素 (Positive)               | 消极因素 (Negative)               |
+|-------------|-----------------------------------|-----------------------------------|
+| **内部因素** | **S (优势 - Strengths)**          | **W (劣势 - Weaknesses)**         |
+|             | 1. {优势描述}                     | 1. {劣势描述}                     |
+|             |    • 数据证据: {事实/财务指标}    |    • 数据证据: {瓶颈/负面指标}    |
+|             |    • 文献引文: [引文编号]         |    • 文献引文: [引文编号]         |
+|             |    • 影响程度: {高/中/低}          |    • 影响程度: {高/中/低}          |
+|             |                                   |                                   |
+| **外部因素** | **O (机会 - Opportunities)**      | **T (威胁 - Threats)**            |
+|             | 1. {机会描述}                     | 1. {威胁描述}                     |
+|             |    • 外部依据: {行业趋势/政策变化}|    • 外部依据: {竞争压力/合规风险}|
+|             |    • 文献引文: [引文编号]         |    • 文献引文: [引文编号]         |
+|             |    • 发生概率: {高/中/低}          |    • 发生概率: {高/中/低}          |
+|             |    • 影响程度: {高/中/低}          |    • 影响程度: {高/中/低}          |
 ```
 
-Every score must reference specific evidence from the six-dimension data collection.
+### SWOT 战略对策矩阵 (SWOT Strategic Alignment)
+分析完 SWOT 矩阵后，必须输出以下对策建议（每项 1-2 条）：
+- **SO 增长性战略**（利用内部优势夺取外部机会）：提出如何放大优势以匹配新市场的具体行动。
+- **WO 扭转型战略**（克服内部劣势以利用外部机会）：提出如何弥补自身短板以抓住外部机遇。
+- **ST 多元化战略**（利用内部优势规避外部威胁）：提出如何发挥核心专长抵抗外部竞争或合规冲击。
+- **WT 防御性战略**（减少内部劣势并避开外部威胁）：提出如何进行风险控制或战略收缩以谋求生存。
+
+---
+
+## 2. 竞争壁垒量化评分模型 (Moat Scoring)
+
+针对 7 个竞争壁垒维度进行权重加权评分，打出壁垒评级（A+/A/B+/B/C+/C）。
+
+| 评估维度 | 权重 | 强壁垒分值区间 (4.0 - 5.0) | 中等壁垒分值区间 (2.0 - 4.0) | 弱壁垒分值区间 (0.0 - 2.0) |
+|---|:---:|---|---|---|
+| **网络效应** | 20% | 4.5 — 强双边或单边网络效应，极难被替代（如头部社交、双边交易平台） | 3.0 — 存在一定用户黏性，但面临迁移竞品 | 1.5 — 几乎无网络效应，用户单点单次消费 |
+| **规模经济** | 15% | 4.0 — 随着规模扩大，单位成本较小规模竞品下降 30% 以上 | 2.5 — 成本随规模下降 10-30% | 1.0 — 重资产无明显规模效应，成本下降 <10% |
+| **品牌溢价与壁垒** | 15% | 4.0 — 绝对的市场标杆，拥有极高的定价权与高复购率 | 2.5 — 知名品牌，但价格竞争激烈 | 1.0 — 大宗商品化，用户对价格极度敏感 |
+| **技术与专利壁垒** | 15% | 4.0 — 拥有核心底层专利，技术断代优势明显，难以绕过 | 2.5 — 拥有一定专利保护，但存在替代技术 | 1.0 — 仅拥有外围专利，无实质性技术断代 |
+| **客户迁移转换成本** | 15% | 4.0 — 深度生态绑定，数据或软硬件迁移成本极高 | 2.5 — 存在一定的迁移摩擦和时间成本 | 1.0 — 极低转换成本，随时可以流失 |
+| **政策准入与资质牌照** | 10% | 3.5 — 强监管行业，新牌照几乎停发或获取成本极高 | 2.0 — 存在标准行业资质要求，获取周期长 | 0.5 — 无资质壁垒，自由竞争 |
+| **数据资产积累** | 10% | 3.5 — 拥有海量独占的高质量闭环历史数据，已用于AI/算法优化 | 2.0 — 积累了部分运营数据，但无深度开发 | 0.5 — 数据碎片化，或全部来自公开网络 |
+
+### 壁垒得分计算公式
+$$\text{壁垒总得分} = \sum(\text{维度得分} \times \text{对应权重})$$
+
+### 评级映射表
+- **得分 ≥ 3.5**：`A+` (极强壁垒 / 护城河极深)
+- **得分 ≥ 2.8**：`A`  (强壁垒 / 护城河稳固)
+- **得分 ≥ 2.0**：`B+` (良好壁垒 / 存在护城河)
+- **得分 ≥ 1.5**：`B`  (中等壁垒 / 护城河较浅)
+- **得分 ≥ 1.0**：`C+` (限制性壁垒 / 护城河脆弱)
+- **得分 < 1.0**：`C`  (无壁垒 / 处于自由竞争红海)
+
+---
+
+## 3. 风险矩阵评估模型 (Risk Matrix)
+
+强制对以下 8 个关键风险类别进行量化概率与影响打分：
+
+### 风险等级打分表
+
+**发生概率 (Probability)**：
+- **高 (High)** | 概率 > 70% | 权重得分: `0.8 - 1.0`
+- **中 (Medium)** | 概率 30% - 70% | 权重得分: `0.4 - 0.7`
+- **低 (Low)** | 概率 < 30% | 权重得分: `0.1 - 0.3`
+
+**影响程度 (Impact)**：
+- **高 (High)** | 破坏性，造成 >30% 的营收减损或核心合规阻断 | 影响分值: `3`
+- **中 (Medium)** | 严重性，造成 10% - 30% 的营收减损或局部停产 | 影响分值: `2`
+- **低 (Low)** | 可承受，造成 <10% 的营收波动或轻微合规纠纷 | 影响分值: `1`
+
+**综合风险值 (Risk Value)** = $\text{概率得分} \times \text{影响分值}$
+- **红区 (高危风险)** | 风险值 $\ge 2.0$：必须制定即时应对策略与应急预案。
+- **黄区 (中度风险)** | 风险值 $1.0 - 2.0$：需要持续监测与预防性规避。
+- **绿区 (低度风险)** | 风险值 $< 1.0$：定期审视并接受该风险。
+
+### 8 大强制风险类别
+1. **市场风险**：行业增速放缓、宏观经济周期、消费需求转移。
+2. **竞争风险**：强力竞品降价、巨头跨界降维打击。
+3. **技术替代风险**：底层技术路线被革命性迭代或颠覆。
+4. **监管与合规风险**：行业政策收紧、出口管制、数据合规惩罚。
+5. **财务与资金风险**：资金链紧张、坏账率飙升、汇率风险。
+6. **运营与供应链风险**：核心零部件断供、物流阻断、单一供应商依赖。
+7. **人才流失风险**：核心科研/管理团队被挖角、薪酬吸引力下降。
+8. **地缘与政治风险**：贸易摩擦、海外资产受限、本土化数据壁垒。
+
+---
+
+## 4. 综合评分 scorecard
+
+将上述 SWOT 优势、壁垒及风险合并打出综合企业健康度百分制评分（或 10 分制）：
+
+```
+| 评估维度 | 维度得分 (1-10分) | 权重占比 | 加权得分 | 核心支撑事实与依据 |
+|---|:---:|:---:|:---:|---|
+| 业务与产品质量 | X/10 | 25% | | |
+| 竞争地位与壁垒 | X/10 | 20% | | |
+| 财务健康状况 | X/10 | 20% | | |
+| 增长与扩张潜能 | X/10 | 15% | | |
+| 风险控制表现 | X/10 | 10% | | |
+| 管理水平与治理 | X/10 | 10% | | |
+| **综合总得分** | | **100%** | **X/10** | |
+```
+每一个单项得分必须显式指引到六维度数据采集所得出的确凿客观事实，严禁主观无根据打分。
