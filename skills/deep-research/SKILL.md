@@ -456,6 +456,7 @@ git commit -m "stage: registry-outline-built"
      git add .
      git commit -m "stage: drafting-section-[SectionName]"
      ```
+   - 每次循环输出章节进度状态：`[P5 drafting] section {index}/{total}: [SectionName] complete. Git Stage: drafting-section-[SectionName]`
 
 ### 3. 断点续写与恢复机制 (Checkpoint Resume)
 若中途发生截断或异常中断，Lead Agent 重新启动时自动解析 `kanban.drafting_progress` 看板：
