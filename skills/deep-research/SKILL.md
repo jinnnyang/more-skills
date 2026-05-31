@@ -431,32 +431,46 @@ git commit -m "stage: registry-outline-built"
 
 ---
 
-## P5: Draft from Notes
+## P5: Draft from Notes (Segmented Drafting & Loop-Append)
 
-Write section by section using [references/report_template_v6.md](references/report_template_v6.md).
+为了彻底避免模型在大文本生成时触发最大输出 Token 截断（`max_output_tokens` 限制），禁止一次性生成完整报告，必须强制执行**分章节顺序生成与追加拼接（Loop-Append）**：
 
-**Rules:**
-- Every factual claim needs citation [n]
-- Numbers/percentages must have source
-- Add **confidence marker** per section: High/Medium/Low with rationale
-- Add **counter-claim sentence** when evidence conflicts
-- Embed localized images from `assets/` using standard Markdown `!["alt"](assets/filename.png "Title")` (alt text must be detailed enough for downstream LLMs).
-- For diagrams, if drawing skills generated PNGs, embed them. Otherwise, write syntax-error-free Mermaid code blocks following `references/visualization_mermaid_guide.md`.
-- No new sources may be introduced
-- Use [unverified] for unsupported statements
+### 1. 初始化写作看板与文档 (Intake & Initialization)
+1. Lead Agent 读取 P4 大纲，将所有待撰写的章节标题写入 `kanban/project_state.json` 中的 `kanban.drafting_progress.pending_sections` 列表。
+2. 自动在本地创建报告草稿目标文件（如 `report.md`），写入报告标题、元数据及 Executive Summary，初始化文件。
 
-**Anti-hallucination:**
-- Lead agent never invents URLs — only from subagent notes
-- Lead agent never fabricates data — mark [unverified] if number not in notes
+### 2. 分章节流式生成与追加循环 (Segmented Loop-Append)
+对 `pending_sections` 中的每一个章节执行以下循环调用：
+1. **上下文空间优化 (Context Optimization)**：
+   - 清理模型上下文中的多余历史会话，**不要**带入非当前章节的冗余源文献全文。
+   - 仅载入：当前章节大纲、对应的子任务 findings 笔记、全局引用注册表（Citation Registry）。
+2. **章节内容撰写**：
+   - 严格遵循引用规则：每个论点对应引文 [n]，数字必须有来源，证据冲突时成对给出反驳。
+   - 嵌入多媒体佐证：使用 `!["alt"](assets/filename.png "Title")` 格式嵌入本地图片（alt 必须高度详尽描述图片数据）；使用防错 Mermaid 语法编写图表。
+   - **单章节控制**：高密度、干货化生成，单章控制在 400-800 字，防止单个章节自身发生截断。
+3. **追加合并与状态序列化**：
+   - 使用文件追加写入机制，将生成的章节内容追加至目标 `report.md` 尾部。
+   - 更新 `project_state.json` 看板：将该章节移出 `pending_sections` 并写入 `completed_sections`。
+   - 执行单章节 Git 自动提交以留存进度副本：
+     ```powershell
+     git add .
+     git commit -m "stage: drafting-section-[SectionName]"
+     ```
 
-### 草稿完成与 Git 自动提交
-草稿完成后，更新项目状态为草稿完成，并在根目录下执行 Git 自动提交：
-```powershell
-git add .
-git commit -m "stage: draft-report-written"
-```
+### 3. 断点续写与恢复机制 (Checkpoint Resume)
+若中途发生截断或异常中断，Lead Agent 重新启动时自动解析 `kanban.drafting_progress` 看板：
+- 识别 `completed_sections` 并确认其实际已追加写入文件尾部。
+- 从 `pending_sections` 列表的首项开始，继续执行循环生成和追加，释放已完成章节的上下文。
 
-Status: `[P5 complete] Draft report written. Word count: ~{words}. Git Stage: draft-report-written.`
+### 4. 汇总附录与最终提交
+1. 完成所有章节撰写后，追加生成 `## 参考文献 / References` 及 `## 附录：多媒体佐证 / Appendix: Multimedia Evidence` 列表并拼接到文件尾端。
+2. 更新项目整体看板，并在项目根目录下执行草稿阶段最终 Git 提交：
+   ```powershell
+   git add .
+   git commit -m "stage: draft-report-written"
+   ```
+
+Status: `[P5 complete] Segmented draft report completed and merged. Git Stage: draft-report-written.`
 
 ---
 

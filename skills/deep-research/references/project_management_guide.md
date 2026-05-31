@@ -78,6 +78,21 @@
       "P6": "TODO",
       "P7": "TODO"
     },
+    "drafting_progress": {
+      "output_file": "report.md",
+      "total_sections": 6,
+      "completed_sections": [
+        "Executive Summary",
+        "1. Policy Timeline"
+      ],
+      "pending_sections": [
+        "2. Supply Chain Impact",
+        "3. Alternative Solutions",
+        "4. Recommendations",
+        "References & Media"
+      ],
+      "last_updated": "2026-05-29T16:15:00Z"
+    },
     "tasks": [
       {
         "id": "task-a",
@@ -130,7 +145,7 @@
 | **P1** | 交互确认完成，项目目录及 `plan/` 初始化完毕 | `stage: plan-initialized` | 确立调研项目的基准框架、范围与任务板设计 |
 | **P2** | 所有子代理（或串行抓取）的任务 notes 写回 `findings/` 完毕 | `stage: research-notes-completed` | 抓取阶段完成，锁定所有子任务 notes 数据源 |
 | **P3/P4** | Citation 注册表与 Evidence-Mapped Outline 构建完毕 | `stage: registry-outline-built` | 完成数据源洗白与大纲锁骨架 |
-| **P5** | Lead Agent 撰写完报告初稿 | `stage: draft-report-written` | 完成主体报告撰写，准备进入交叉验证与纠错 |
+| **P5** | Lead Agent 撰写完各章节并追加合并为报告草稿完毕 | `stage: draft-report-written` | 完成主体报告撰写，准备进入交叉验证与纠错 |
 | **P6/P7** | 完成纠错与多核校验，导出最终报告，多媒体及图表嵌入到位 | `stage: report-finalized` | 锁定发布版调研项目 |
 
 ### Git 执行容错
@@ -142,3 +157,24 @@ git add .
 git commit -m "stage: ..."
 ```
 如果依然由于系统环境原因失败，则记录 warning 至运行日志中，但继续推进研究。
+
+---
+
+## 5. 断点续写与截断恢复机制 (Segmented Resumption)
+
+由于超长调研报告生成极易触碰 LLM 的单次响应 Token 限制，本技能强制采用**按章节流式追加写入**。为应对中途网络异常或模型截断，设计如下恢复逻辑：
+
+### 5.1 进度追踪与临时落盘
+1. 在 P5 启动时，Lead Agent 根据 P4 大纲规划，将所有待撰写的章节名称写入 `kanban/project_state.json` 中的 `kanban.drafting_progress.pending_sections` 列表。
+2. 每次完成一个章节的生成并追加合并写入报告文件后，将该章节从 `pending_sections` 移动到 `completed_sections`，并立即执行看板文件的写入与 Git 本地自动提交（使用消息 `stage: drafting-section-[name]`）。
+
+### 5.2 截断恢复机制
+如果程序异常中断（如模型输出越界或接口超时报错），当用户或系统再次启动该调研项目时：
+1. **自动识别断点**：Lead Agent 自动读取并解析 `kanban/project_state.json` 中的 `kanban.drafting_progress`。
+2. **状态验证**：
+   - 检查已生成的报告文件尾部，验证已完成章节是否确实写入成功。
+   - 检查当前待生成的 pending 章节。
+3. **断点续写**：
+   - 引导提示词中自动加入续写标记，清空当前对话中对已生成章节的具体展开内容（释放上下文空间），仅保留大纲框架和全局引文。
+   - 针对下一个待生成的 `pending_sections[0]` 发起调用，并在生成后以 `append` 方式写入报告文件。
+   - 续写时若发现剩余总 Token 紧张，自动调用压缩策略，缩减剩余章节的句式厚度。

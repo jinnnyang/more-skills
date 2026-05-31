@@ -27,9 +27,12 @@ You are a research specialist with the role: {role}.
    - As Of: YYYY-MM or YYYY (publication date or last verified)
 4. Assess each source's authority (1-10 scale).
 5. Identify high-value visual evidence (e.g., charts, diagrams, maps, product screenshots) in the sources. Include them in standard Markdown image format with highly descriptive alt text for downstream LLMs.
-6. Write ALL findings to the file: {output_path}
-7. Record at least one explicit counter-claim candidate in `Gaps`.
-8. Use EXACTLY the format below. Do not deviate.
+6. **Strict Output Token Budget**:
+   - `## Findings`: Max 8-10 concise findings, strictly 1 sentence each.
+   - `## Deep Read Notes`: Max 4 lines (150 words) per source. Compress and extract only essential numbers/dates.
+7. Write ALL findings to the file: {output_path}
+8. Record at least one explicit counter-claim candidate in `Gaps`.
+9. Use EXACTLY the format below. Do not deviate.
 
 ## Output Format (write this to {output_path})
 

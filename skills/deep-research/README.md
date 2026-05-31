@@ -14,6 +14,7 @@ Following this optimization, the skill has been upgraded to an **engineered pers
 4. **LLM-Friendly Alt Text Standards**: Localized media assets must be described with highly descriptive `alt` data trends to help downstream LLMs comprehend the visual details without image inputs.
 5. **Diagram Plotting & Fallback Policy**: Prioritizes tool discovery to check for registered drawing/plotting skills (e.g. `canvas-design` or Python libraries). If found, it outputs PNG files to `assets/`; otherwise, it falls back to writing robust inline Mermaid syntax.
 6. **Automated Pre-flight Environment Checks**: Integrates `check_env.py` to automatically check network latencies, Git CLI availability, directory write permissions, and required Python library packages.
+7. **Giant Text Streaming & Resumption**: Refactors the drafting stage (P5) into segmented, section-by-section generation and stream appending (Loop-Append). Realizes a checkpoint-resume mechanism using `drafting_progress` in Kanban, and applies strict output budgeting for subagents, preventing token truncation errors.
 
 ---
 
@@ -26,12 +27,13 @@ Prior to project initialization, the Lead Agent automatically generates **about 
 - **Project Folder Name** suggestions
 The user makes selection choices or minor adjustments, allowing swift intake.
 
-### 2. Five-Stage Git Auto-Commit Lifecycle
+### 2. Multi-Stage Git Auto-Commit Lifecycle
 To ensure data safety across long-running research cycles, the skill performs automated commits at key stages:
 - **P1 Completion**: `stage: plan-initialized` (outlines and Kanban tasks designed)
 - **P2 Completion**: `stage: research-notes-completed` (all raw task notes written back to `findings/`)
 - **P4 Completion**: `stage: registry-outline-built` (citations audited and outline/diagrams designed)
-- **P5 Completion**: `stage: draft-report-written` (initial draft completed)
+- **P5 Section Appended**: `stage: drafting-section-[SectionName]` (commits after each section to save progress)
+- **P5 Completion**: `stage: draft-report-written` (all draft sections appended and completed)
 - **P7 Completion**: `stage: report-finalized` (final reviews complete, media and Mermaid diagrams fully localized and verified)
 
 ---
@@ -82,7 +84,8 @@ If a research run is interrupted, the skill reloads `kanban/project_state.json` 
 
 | Version | Milestone & Changes | Commit Hash |
 | :--- | :--- | :--- |
-| **v2.5.0** (Current) | **Engineered Persistent Version**: Project folder structures and Git tracking; Kanban JSON state management; multimedia localization and downloading pipeline; diagram plotting tool discovery & Mermaid fallback; pre-flight check script. | `Current Modification` |
+| **v2.6.0** (Current) | **Output Truncation Prevention**: Refactored P5 drafting to segmented generation (Loop-Append) with checkpoint resumption; introduced strict token budgeting for subagent notes. | `Current Modification` |
+| **v2.5.0** | **Engineered Persistent Version**: Project folder structures and Git tracking; Kanban JSON state management; multimedia localization and downloading pipeline; diagram plotting tool discovery & Mermaid fallback; pre-flight check script. | `2fd997c` |
 | **v2.4.0** | Fixed source accessibility policy (circular verification vs exclusive advantages); updated citation registry formats; Counter-Review Team v2. | `693c403` |
 | **v2.0.0** | Enterprise Research Mode with SWOT matrices and 3-level quality control. | `064c73e` |
 | **v1.0.0** | Legacy deep research workflow. | `ffda537` |

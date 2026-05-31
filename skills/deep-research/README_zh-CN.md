@@ -14,6 +14,7 @@
 4. **图像 Alt 说明 LLM 友好化**：采集的多媒体佐证必须配备极其详尽的 `alt` 数据及趋势说明，帮助其他 LLM 在阅读 Markdown 报告时完美理解图片承载的真实信息。
 5. **可视化绘图回落策略**：优先通过工具发现机制检测并调用注册的绘图技能（如 `canvas-design` 或 Python 绘图库）输出 PNG 并保存至 `assets/`；在无专门绘图技能时，自动回落为编写防错的 Markdown 内联 Mermaid 代码块。
 6. **自动化环境与网络检查**：集成 `check_env.py`，在 P0 阶段自动测试网络延时、Git 可用性、目录写权限及必要 Python 第三方依赖。
+7. **大文本流式追加与防截断**：将 P5 阶段重构为分章节循环生成并流式追加（Loop-Append）写入，并在看板中实时序列化 `drafting_progress`。若发生中途截断，支持从断点恢复续写，并对子代理输出设定严格的 token 预算，彻底解决 `length` 截断导致的工具崩溃问题。
 
 ---
 
@@ -26,12 +27,13 @@
 - **项目根目录命名**候选（Project Name）
 用户只需做选择题或微调，即可快速进入工程初始化。
 
-### 2. 五大阶段 Git 自动提交生命周期
+### 2. 多阶段 Git 自动提交生命周期
 为确保长周期复杂调研的数据安全性，技能在以下关键卡点自动执行 Git 提交：
 - **P1 阶段完毕**：`stage: plan-initialized`（大纲与看板已规划）
 - **P2 阶段完毕**：`stage: research-notes-completed`（所有抓取 notes 均已写回 `findings/`）
 - **P4 阶段完毕**：`stage: registry-outline-built`（Citations 洗白完毕且大纲与图表设计锁骨架）
-- **P5 阶段完毕**：`stage: draft-report-written`（报告初稿撰写完毕）
+- **P5 阶段各章节追加**：`stage: drafting-section-[SectionName]`（写完每个章节触发自动提交，防止截断）
+- **P5 阶段最终完毕**：`stage: draft-report-written`（报告初稿全部章节拼接完毕）
 - **P7 阶段完毕**：`stage: report-finalized`（完成最终纠错，多媒体与 Mermaid 完成定位渲染并归档）
 
 ---
@@ -82,7 +84,8 @@ python scripts/check_env.py
 
 | 版本号 | 关键改进与里程碑 | 对应提交哈希 (Commit Hash) |
 | :--- | :--- | :--- |
-| **v2.5.0** (当前) | **工程化重构版**：引入工程化项目目录与 Git 版本追踪；集成跨会话 JSON 看板状态；建立多媒体收集、防盗链下载、LLM 友好 Alt 编写规范；引入图表生成技能优先与 Mermaid 回落机制；新增 P0 `check_env.py` 自动化检查。 | `当前修改` |
+| **v2.6.0** (当前) | **大文本防截断优化**：重构 P5 草稿撰写为分章节流式追加写入与中断续写机制；引入子代理输出严格字数与 Token 预算。 | `当前修改` |
+| **v2.5.0** | **工程化重构版**：引入工程化项目目录与 Git 版本追踪；集成跨会话 JSON 看板状态；建立多媒体收集、防盗链下载、LLM 友好 Alt 编写规范；引入图表生成技能优先与 Mermaid 回落机制；新增 P0 `check_env.py` 自动化检查。 | `2fd997c` |
 | **v2.4.0** | 修正来源可访问性政策：明确 circular verification 与 exclusive advantage 的界限；更新 Citations 注册表格式；发布 Counter-Review Team v2 版。 | `693c403` |
 | **v2.0.0** | 引入企业级分析模式（Enterprise Research Mode），新增 SWOT 矩阵分析及三级质量管控。 | `064c73e` |
 | **v1.0.0** | 基础深度调研技能版本。 | `ffda537` |
