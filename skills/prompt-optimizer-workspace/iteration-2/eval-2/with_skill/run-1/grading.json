@@ -1,0 +1,35 @@
+{
+  "expectations": [
+    {
+      "text": "Output must contain EARS-formatted requirements (such as 'When', 'If', 'While')",
+      "passed": true,
+      "evidence": "Found EARS keywords or normative modal verbs (shall/must/when/if/while)."
+    },
+    {
+      "text": "Output must ground in domain theories like Gestalt Principles, Hick's Law, or Progressive Disclosure",
+      "passed": true,
+      "evidence": "Found references to domain terms matching: ['gestalt', 'progressive disclosure', 'ux', 'ui']."
+    },
+    {
+      "text": "Output must follow the standard Role/Skills/Workflows/Examples/Formats layout",
+      "passed": true,
+      "evidence": "All RSWEF sections are present."
+    },
+    {
+      "text": "Output must include layout or forecast details examples with real data, not placeholders",
+      "passed": true,
+      "evidence": "Examples or specific constraints are present."
+    },
+    {
+      "text": "Output should include a Next Step / Pipeline Handoff section suggesting downstream skills",
+      "passed": true,
+      "evidence": "Found Next Step/Pipeline Handoff keyword or options checklist."
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  }
+}

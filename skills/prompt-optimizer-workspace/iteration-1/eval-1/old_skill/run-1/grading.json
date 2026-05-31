@@ -1,0 +1,35 @@
+{
+  "expectations": [
+    {
+      "text": "Output must contain EARS-formatted requirements (such as 'When', 'If', 'While')",
+      "passed": true,
+      "evidence": "Found EARS keywords or normative modal verbs (shall/must/when/if/while)."
+    },
+    {
+      "text": "Output must ground in domain theories like Zero Trust, Defense in Depth, or Privacy by Design",
+      "passed": true,
+      "evidence": "Found references to domain terms matching: ['zero trust', 'defense in depth', 'security']."
+    },
+    {
+      "text": "Output must follow the standard Role/Skills/Workflows/Examples/Formats layout",
+      "passed": true,
+      "evidence": "All RSWEF sections are present."
+    },
+    {
+      "text": "Output must specify password rules (length, complexity, MFA conditions)",
+      "passed": true,
+      "evidence": "Examples or specific constraints are present."
+    },
+    {
+      "text": "Output should include a Next Step / Pipeline Handoff section suggesting downstream skills",
+      "passed": false,
+      "evidence": "No Next Step/Pipeline Handoff section found."
+    }
+  ],
+  "summary": {
+    "passed": 4,
+    "failed": 1,
+    "total": 5,
+    "pass_rate": 0.8
+  }
+}

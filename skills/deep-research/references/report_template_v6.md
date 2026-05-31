@@ -1,99 +1,88 @@
-# {{TITLE}}
+# 调研报告模板 (Report Template)
 
-> 研究日期: {{DATE}} | 来源数量: {{SOURCE_COUNT}} | 字数: ~{{WORD_COUNT}} | 模式: {{MODE}} | AS_OF: {{AS_OF}} | 官方源占比: {{OFFICIAL_SHARE}}
+最终生成的 Markdown 研究报告必须严格套用以下排版和章节大纲。
+
+---
+
+## 报告模板大纲
+
+```markdown
+# {{报告标题 / TITLE}}
+
+> 调研日期: {{DATE}} | 来源文献数: {{SOURCE_COUNT}} | 模式: {{MODE}} | AS_OF: {{AS_OF}} | 官方/学术信源占比: {{OFFICIAL_SHARE}}
 
 ## 摘要 / Executive Summary
 
-{{200-400 words summarizing key findings, methodology, conclusions, and risks.}}
+{{对调研的核心发现、供应链或技术冲击、关键结论和潜在风险进行 200-400 字的精炼概述。}}
 
 ---
 
-## 目录
+## 目录 / Table of Contents
 
-{{Auto-generate from actual section headers below.}}
+{{从下方各章节标题自动生成目录列表。}}
 
 ---
 
-{{BODY SECTIONS —  Adapt to topic type and include opposing interpretation per section.}}
+{{正文章节 — 按照大纲设计分章节流式追加。单章字数严格控制在 400-800 字，防范 Token 溢出。}}
 
-For each section:
+## 1. {{章节一标题}}
 
-## N. [Topic-Specific Section Title]
+{{章节正文叙述。必须包含对立事实的客观平衡陈述。所有论断必须附带引文标记如 [1][2]，数据必须引用明确。
 
-{{Section content with inline citations [1][2].
-Standard mode: 500-1000 words per section.
-Lightweight mode: 300-600 words per section.
-
-数据可视化与绘图规则：
-- 优先利用工具发现机制，调用专门的绘图技能（如 canvas-design / matplotlib 等）将结果输出为图片文件，移动至 assets/ 目录下，使用 !["alt"](relative_path "title") 进行正文嵌入。
-- 若无专门的绘图技能，则回落至使用 Mermaid 语法直接在报告正文中进行绘图，例如：
+数据可视化规则：
+- 优先检测并调用绘图工具生成 PNG 图片并存入 assets/ 目录，使用标准 markdown 格式 !["alt"](./assets/文件名.png "Title") 进行嵌入。alt 必须是能让其他 LLM 准确理解图片内容的详细描述。
+- 若无专门绘图工具，则回落为 Mermaid.js 代码块，例如：
   ```mermaid
   flowchart TD
       A["A 节点"] --> B["B 节点"]
   ```
-  （请严格遵循 visualization_mermaid_guide.md 防错规范，节点文本一律用双引号包裹）。
-
-Rules:
-- 每个事实性论点都需要引用 [n]
-- 数字/百分比必须有来源
-- 出现不同证据时要成对给出支持与反驳
+  （注意：Mermaid 节点内的文本必须使用双引号包裹，ID 禁用特殊字符）。
 }}
 
-**置信度:** High/Medium/Low
-
-**依据:** {{Why this confidence level — source agreement, evidence quality, data availability}}
-
-**反方解释:** {{One explicit opposing interpretation with supporting citations if any, or [unverified] if insufficient.}}
+**置信度**: High / Medium / Low
+**依据说明**: {{为什么给出该置信度打分：信源交叉验证程度、文献发布时间、数据详实度}}
+**对立观点**: {{明确列出一种反方解释，若无支持数据，则标注 [unverified]}}
 
 ---
 
-{{COUNTER-REVIEW SUMMARY}}
+## 2. {{章节二标题}}
+...
 
-- **核心争议 1:** [主张 A 与反向证据 B 对比] [n][m]
+---
+
+## 核心争议与对立解释 / Key Controversies
+
+- **核心争议 1:** [主张 A 与反向证据 B 对比说明] [1][3]
 - **核心争议 2:** ...
 
 ## 关键发现 / Key Findings
 
-{{3-5 findings in Standard mode, 2-3 in Lightweight. Each finding should:}}
-- 具体结论
-- 对应引文
-- 信心说明
-
-Example:
-- **发现 1:** [Most important discovery] [3][7]
-- **发现 2:** [Second most important] [1][4]
+- **发现 1:** [最重要的调研发现事实陈述] [3]
+- **发现 2:** [次重要的调研发现事实陈述] [1][4]
 
 ---
 
-## 局限性与未来方向 / Limitations & Future Directions
+## 研究局限与未来方向 / Limitations & Future Directions
 
-### 本研究局限
-{{Be explicit:
-- What topics/angles couldn't be covered and why
-- Methodological limits (web-accessible sources, paywall, language, timing)
-- Source coverage gaps and counter-claim evidence gaps
-}}
+### 调研局限性说明
+- 本研究范围受阻于公开网络可获得的数据源、语言及时间阻断限制。
+- 缺乏部分商业机密/专利许可数据 [unverified]。
 
-### 未来方向
-{{Concrete suggestions for follow-up research with priority and responsible evidence type.}}
+### 未来调研建议
+- 针对特定环节进行更精细的专家调研或实地考查。
 
 ---
 
 ## 参考文献 / References
 
-[1] Author/Org. "Title". Source-Type: official/academic/secondary-industry/journalism/community/other. As Of: YYYY-MM-DD. URL.
-[2] Author/Org. "Title". Source-Type: ... As Of: YYYY-MM-DD. URL.
-
-Rules:
-- Every [n] in body MUST have matching entry here
-- Every entry here MUST be cited at least once
-- Source-Type and As Of fields are mandatory
-- All URLs MUST come from actual search results (P2 source pool)
+[1] 作者/机构. "文献/报告标题". 信源类型 (official/academic/secondary-industry/journalism/community/other). 截止时间: YYYY-MM-DD. 原始网页URL.
+[2] 作者/机构. "文献/报告标题". 信源类型. 截止时间: YYYY-MM-DD. 原始网页URL.
 
 ---
 
-## 附录：多媒体佐证 / Appendix: Multimedia Evidence
+## 附录：多媒体佐证汇总 / Appendix: Multimedia Evidence
 
-{{所有本地化并下载成功的佐证图片，采用标准相对路径 Markdown 图片嵌入格式，方便其他 LLM 直接阅读，例如：}}
-- !["[描述：如2024年全球中重稀土开采与冶炼份额占比饼图，展示中国在冶炼环节占全球89%份额...]"](assets/task-a_1716943800_sha256.png "全球中重稀土开采冶炼占比")
-- !["[描述：如芯片供应链系统架构图，包含原材料、设计、制造、封测和组装五个阶段...]"](assets/task-b_1716943800_sha256.png "芯片供应链系统架构图")
+- !["[描述：如2024年全球中重稀土开采与冶炼份额占比饼图，展示中国在冶炼环节占全球89%份额...]"](https://example.com/charts/supply-chain.png "全球中重稀土开采冶炼占比") [1]
+- !["[描述：如芯片供应链系统架构图，包含原材料、设计、制造、封测和组装五个阶段...]"](https://example.com/charts/semiconductor-chain.png "半导体精细材料供应链流向图") [2]
+```
+

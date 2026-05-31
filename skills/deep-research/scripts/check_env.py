@@ -40,7 +40,8 @@ def check_write_permissions():
         return {"status": "failed", "error": str(e)}
 
 def check_libraries():
-    libs = ["requests", "PIL", "urllib"]
+    # Only urllib is required, which is a Python standard library.
+    libs = ["urllib"]
     results = {}
     for lib in libs:
         try:
@@ -69,8 +70,8 @@ def main():
     warnings = []
     
     if report["git"]["status"] != "ok":
-        critical_ok = False
-        warnings.append("Git CLI is not installed or not in PATH. Project version tracking will not function.")
+        # Non-blocking, will automatically skip Git commits if missing
+        warnings.append("Git CLI is not installed or not in PATH. Version tracking will be automatically skipped.")
         
     if report["write_permissions"]["status"] != "ok":
         critical_ok = False
@@ -94,3 +95,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

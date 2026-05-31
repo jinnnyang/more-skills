@@ -1,13 +1,18 @@
-## Known Environment Issues
-- [ ] High-latency on external domain fetching can trigger timeouts.
-- [ ] Accessing local files sometimes fails due to encoding conflicts.
+# Learnings (深度研究技能学习经验沉淀)
 
-## Success Patterns
-- [ ] Use subagents to perform web searches and summarize findings.
-- [ ] Always execute a structured counter-review comparing opposing views.
-- [ ] Ground all factual claims in specific sources using sequential citations.
+为智能体提供跨会话的执行经验与已知陷阱规避。
 
-## Failures & Anti-patterns
-- [ ] Avoid circular verification: never use user's private data to discover info they already know.
-- [ ] Avoid single-pass drafting: write the entire draft together rather than splitting sections.
-- [ ] Do not invent URLs or resurrect sources dropped in prior phases.
+## ⚠️ 已知环境与系统问题 (Known Environment Issues)
+- 外部网站爬取可能存在高延迟或超时。
+- 读写本地文件时，如果编码不一致可能会触发编码冲突（强制使用 UTF-8）。
+- 本地可能未安装 Git 命令行客户端（作为 warning 跳过，不应阻断运行）。
+
+## 🎯 成功模式 (Success Patterns)
+- 优先分发给 `research` 子代理进行网络搜索，以最大化释放主智能体（Lead Agent）的上下文空间。
+- 在 P5 阶段严格执行按大纲章节顺序循环生成与流式追加写入（Loop-Append），以彻底规避单次生成时大文本输出被截断的限制。
+- 每个事实论点末尾必须附带全局编号引用（如 `[n]`），并在附录中生成完整对应的引文。
+
+## ❌ 失败与反模式教训 (Failures & Anti-patterns)
+- **避免循环校验**：严禁调用用户的私有数据账户来发现他们自己本来就知道的事情（如自己公司拥有的域名）。
+- **避免大文本一次性生成**：一次性输出数千字报告极易导致模型在中途截断并使得 Python/Markdown 语法解析崩溃，必须分章节追加。
+- **严禁虚构 URL**：文献列表中的 URL 必须绝对来自子任务的真实网络抓取结果，严禁智能体自行捏造。

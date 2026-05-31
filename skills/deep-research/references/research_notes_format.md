@@ -1,151 +1,73 @@
-# Research Notes Format Specification
+# 调研笔记格式规范 (Research Notes Format Specification)
 
-The research notes are the ONLY communication channel between subagents and
-the lead agent. Every fact in the final report must be traceable to a line in
-these notes. No exceptions.
+调研笔记是子代理与主代理（Lead Agent）之间传递客观事实证据的唯一媒介。报告中的每一条客观事实都必须在此笔记中找到依据。
 
-## File Structure
+---
 
+## 1. 结构与存放命名
+子任务的 findings 统一写入项目目录下的 `findings/` 目录：
 ```
-workspace/research-notes/
-  task-a.md       Subagent A writes (history expert)
-  task-b.md       Subagent B writes (transport historian)
-  task-c.md       Subagent C writes (telecom analyst)
-  task-d.md       Subagent D writes (comparative analyst)
-  registry.md     Lead agent builds from task-*.md (P3)
+[project-name]/
+  └── findings/
+        ├── task-a.md       # 子任务 A 笔记 (经济历史专家)
+        ├── task-b.md       # 子任务 B 笔记 (供应链分析师)
+        └── registry.md     # 废弃 (全局引文已统一合并至 KANBAN.md，不再独立建文件)
 ```
 
-## Per-Task Notes Format
+---
 
-Each `task-{id}.md` file follows this exact structure:
+## 2. 子任务笔记格式模板 (`task-{id}.md`)
+
+每一个子任务笔记必须严格按照以下 Markdown 格式输出：
 
 ```markdown
 ---
 task_id: a
-role: Economic Historian
+role: 经济历史分析师
 status: complete
 sources_found: 4
 ---
 
-## Sources
+## 1. 来源信源 (Sources)
 
-[1] Before AI skeptics, Luddites raged against the machine | https://www.nationalgeographic.com/... | Source-Type: secondary-industry | As Of: 2025-08 | Authority: 8/10
+[1] Before AI skeptics, Luddites raged against the machine | https://www.nationalgeographic.com/history/luddites | Source-Type: secondary-industry | As Of: 2025-08 | Authority: 8/10
 [2] Rage against the machine | https://www.cam.ac.uk/research/news/rage-against-the-machine | Source-Type: academic | As Of: 2024-04 | Authority: 8/10
 [3] Luddite | https://en.wikipedia.org/wiki/Luddite | Source-Type: community | As Of: 2026-03 | Authority: 7/10
-[4] Learning from the Luddites | https://forum.effectivealtruism.org/... | Source-Type: community | As Of: 2025-10 | Authority: 6/10
 
-## Findings
+## 2. 调研发现 (Findings)
 
-- Luddite movement began March 11, 1811 in Arnold, Nottinghamshire. [3]
-- Luddites were skilled craftspeople, not anti-technology extremists. [1][2]
-- In the 100M-person textile industry, Luddites never exceeded a few thousand. [2]
-- Government crushed movement: 12 executed at York Assizes, Jan 1813. [3]
-- Movement collapsed by 1817 under military repression. [1]
-- Full textile mechanization transition took 50-90 years (1760s-1850s). [4]
-- Textile workers' real wages dropped ~70% during transition. [4]
-- Key lesson for AI: Luddites organized AFTER displacement began, losing leverage. [4]
+- 卢德运动于 1811 年 3 月 11 日在诺丁汉郡的阿诺德开始。[3]
+- 卢德分子是技术精湛的工匠，而不是盲目反对技术的极端分子。[1][2]
+- 在拥有1亿人口的英国纺织工业中，卢德分子总数从未超过几千人。[2]
+- 英国政府进行了严厉镇压：1813年1月在约克郡处决了12名领导者。[3]
+- 运动在军事镇压下于 1817 年基本熄灭。[1]
 
-## Media Assets
+## 3. 多媒体佐证 (Media Assets)
 
 - !["[1812年全英国纺织工人抗议与军警冲突的黑白雕版画。图中中央为熊熊燃烧的纺织机，四周是手持铁锤的工人和举枪射击的士兵。]"](https://www.nationalgeographic.com/luddite_riot.jpg "1812年Arnold地区暴动图") [1]
 
-## Deep Read Notes
+## 4. 深度阅读笔记 (Deep Read Notes)
 
-### Source [1]: National Geographic — Luddites and AI
-Key data: destroyed up to 10,000 pounds of frames in first year alone.
-  Movement spread from Nottinghamshire to Yorkshire and Lancashire in 1812.
-  Children made up 2/3 of workforce at Cromford factory.
-Key insight: Luddites attacked the SYSTEM of exploitation, not machines per se.
-  They protested manufacturers circumventing standard labor practices.
-Useful for: framing section on historical displacement, correcting "anti-tech" myth
+### 来源 [1]: 国家地理 — 卢德分子与 AI
+- 核心数据: 运动第一年内砸毁了价值近 10,000 英镑的织布机。
+- 核心洞察: 卢德分子并非反对机器本身，而是抗议制造商利用新设备规避当时的标准学徒制度与法定劳动准则。
+- 支持章节: 历史上的技术性失业章节。
 
-### Source [2]: Cambridge University
-Key data: Luddites were "elite craftspeople" not working class broadly.
-  Yorkshire croppers had 7-year apprenticeships. Movement was localized, never exceeded a few thousand.
-Key insight: The movement was smaller and more elite than popular history suggests.
-Useful for: nuancing the scale of historical resistance
+### 来源 [2]: 剑桥大学学术专栏
+- 核心数据: 卢德分子主要由高技能的“精英工匠”组成，拥有 7 年以上的学徒资历。
+- 核心洞察: 运动是高度地方化的，没有大规模的全国组织。
+- 支持章节: 工业革命工人阶级演变研究。
 
-## Gaps
+## 5. 局限与盲区 (Gaps)
 
-- Could not find quantitative data on how many specific jobs were lost to textile machines
-- No Chinese-language academic sources on Luddite movement found
-- Alternative explanation: displacement narrative may be partly confounded by wartime demand shocks
+- 未能找到因纺织机引入导致失业人数的准确量化历史数据。
+- 缺乏非英语学界对该历史运动的平行评估报告。
 ```
 
-## Source Line Format
+---
 
-Each source line in the `## Sources` section must contain exactly:
-```
-[n] Title | URL | Source-Type: one-of{official|academic|secondary-industry|journalism|community|other} | As Of: YYYY-MM(or YYYY) | Authority: score/10
-```
+## 3. 核心约束原则
 
-Rules:
-- [n] numbers are LOCAL to this task file (start at [1])
-- Lead agent will reassign GLOBAL [n] numbers in registry.md
-- URL must be from an actual search result (subagent MUST NOT invent URLs)
-- `Authority` score follows guide in quality-gates.md
-- `As Of` must be provided; use `undated` if unknown
-- High-confidence claims in final report must use `official` or `academic` sources
-
-## Findings Line Format
-
-Each finding must be:
-- One sentence of specific, factual information
-- End with source number(s) in brackets: [1] or [1][2]
-- Max 10 findings per task (forces prioritization)
-- No vague claims like "research shows..." — name what specifically
-
-Good: `Full textile mechanization transition took 50-90 years (1760s-1850s). [4]`
-Bad: `The transition took a long time. [4]`
-Bad: `Studies suggest that it was a lengthy process.` (no source, vague)
-
-## Deep Read Notes Format
-
-For each source that was web_fetched (full article read):
-- Key data: specific, numeric evidence from article
-- Key insight: the one thing this source says that others don't
-- Useful for: which final section this supports
-
-Max 4 lines per source. This is a research notebook, not a summary.
-
-## Gaps Section
-
-List what the subagent searched for but could NOT find, and possible counter-readings.
-This signals where evidence is thin and confidence should be lowered.
-
-## Registry Format (built by lead agent in P3)
-
-The `registry.md` file merges all task sources into a global registry and adds source-type / as-of fields.
-
-```markdown
-# Citation Registry
-Built from: task-a.md, task-b.md, task-c.md, task-d.md
-
-## Approved Sources
-
-[1] National Geographic — Luddites | https://www.nationalgeographic.com/... | Source-Type: secondary-industry | As Of: 2026-03 | Auth: 8 | From: task-a
-[2] Cambridge — Rage against machine | https://www.cam.ac.uk/... | Source-Type: academic | As Of: 2012-04 | Auth: 8 | From: task-a
-[3] OpenAI — Day Horse Lost Job | https://blogs.microsoft.com/... | Source-Type: official | As Of: 2026-01 | Auth: 8 | From: task-b
-...
-[N] Last source
-
-## Dropped
-
-x Quora answer | https://www.quora.com/... | Source-Type: community | As Of: 2024-10 | Auth: 3 | Reason: below threshold
-x Study.com | https://study.com/... | Source-Type: secondary-industry | As Of: undated | Auth: 4 | Reason: better sources available
-
-## Stats
-
-Total evaluated: 22
-Approved: 16
-Dropped: 6
-Unique domains: 12
-Source-type: official 4 / academic 3 / secondary-industry 5 / journalism 2 / community 2
-Max single-source share: 3/16 = 19% (pass)
-```
-
-Rules for registry:
-- [n] numbers here are FINAL — they appear unchanged in the report
-- Every [n] in the report must exist in the Approved list
-- Every Dropped source must NEVER appear in the report
-- If two tasks found the same URL, keep it once with the higher authority score
+1. **信源本地编号**：子任务笔记中的引用编号 `[n]` 是局部独立的（都从 `[1]` 开始）。主代理将在 P3 阶段整合后转化为全局统一的引文编号并登记在 `KANBAN.md` 中。
+2. **单句发现**：`## 调研发现` 里的每一行必须是一句客观的陈述，且行尾**必须且仅能**以引文编号（如 `[1]`）作为支撑标记。
+3. **图像 URL 指向**：`## 多媒体佐证` 中引用的图片 URL **必须是原始网页链接**，严禁使用虚假的本地或临时文件路径。
