@@ -4,6 +4,13 @@
 
 ---
 
+## 0. 技能上下文强制唤醒 (Skill Context Refresh)
+**极其重要**：在进入本阶段实际处理前，主智能体极易因 P1/P2 的长上下文数据导致“技能遗忘”。
+- **唤醒动作**：Lead Agent 必须在此刻暂停，**显式检索并打印**在 P0 阶段探测到的可用绘图技能（如 `canvas-design`）、事实校验技能（如 `fact-checker`）等。
+- 这不仅防止绘图和质量校验工具被漏用，同时确保在 P3 结束时能将它们准确规划入 Kanban 的后续调用路由中。
+
+---
+
 ## 1. 全局引用注册表数据清洗 (Citations Cleaning)
 1. **去重与全局编号**：读取 `findings/task-*.md` 的 `## Sources`，合并重复 URL，分配全局统一编号 `[1]`, `[2]`, `[3]` 等。
 2. **应用质量门限阈值 (Quality Gates)**：
@@ -21,8 +28,8 @@
 
 ---
 
-## 3. 绘图与可视化工具发现 (Tool Discovery)
-1. **检测环境**：检索当前环境（如 MCP 注册工具、本地 Python 绘图库）以寻找专用的绘图技能（如 `canvas-design` 或 `matplotlib` 绘图脚本）。
+## 3. 绘图与可视化工具确认 (Tool Discovery Decision)
+1. **核对唤醒缓存**：依据第 0 步唤醒的技能清单，确认是否存在可调用的绘图技能（如 `canvas-design` 或 `matplotlib` 绘图脚本）。
 2. **决策路由**：
    - 若发现可用绘图技能，则在 `KANBAN.md` 中标记：`优先使用绘图技能生成 PNG`。
    - 若未发现，则标记：`回落至 Mermaid 语法内联渲染`。
@@ -35,16 +42,13 @@
 ### 看板更新示例：
 ```markdown
 ## 2. 阶段生命周期进度
-- [x] P0: 环境初始化与交互式 Intake
-- [x] P1: 调研任务板规划
-- [x] P2: 子任务分发与抓取
+...
 - [/] P3: 文献治理与多媒体过滤 (进行中)
 ...
 
 ## 5. 全局引文与多媒体注册表
 ### 已校验引文 (Citations)
 - [1] 新华社. "稀土出口配额最新管理细则". 官方源. As Of: 2025-10. URL: https://example.com/china-rare-earth-policy
-- [2] Gartner. "2026年半导体辅料供应链趋势". 行业源. As Of: 2026-02. URL: https://example.com/gartner-semiconductor-report
 
 ### 收集的多媒体佐证 (Media)
 - !["2024年全球中重稀土开采与冶炼份额占比饼图..."](https://example.com/charts/supply-chain.png "全球中重稀土开采冶炼占比") [1]
@@ -54,4 +58,3 @@
 ```
 
 *注：本阶段不需要触发 Git 自动提交。*
-
