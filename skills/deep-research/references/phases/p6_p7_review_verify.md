@@ -1,48 +1,44 @@
-# Phase 6 & 7: 交叉校验、纠错与最终发布 (Review & Finalization)
+# Phase 6 & 7: Adversarial Review, Verification, & Finalization
 
-本阶段指导智能体执行事实合理性检验、大纲与引文对账、Mermaid 及多媒体最终审计，以及项目版本封版归档。
-
----
-
-## 1. 阶段六：单智能体对立观点审查 (Counter-Review)
-彻底移除繁杂的多 Agent 虚构评审团队，收敛为主 Agent 单体（或 `self` 子代理）的自我对立审查：
-1. **反方立场审查**：对报告的主要论断发起相反观点的合理性质疑，寻找可能存在偏见的证据点。
-2. **核心漏洞排查**：
-   - 找出仅依赖单一信源的高危断言，补强论据或调低置信度。
-   - 排查过期的信源（如 3 年前的政策或 6 个月前的快速变化新闻）。
-3. **编写核心争议章节**：在报告尾部追加：
-   ```markdown
-   ## 核心争议与不同解释 / Key Controversies
-   - **争议 1:** [主张 A 与反向证据 B 对比] [n][m]
-   ```
+This phase guides the Lead Agent through conducting factual integrity validation, citation auditing, visual/MITTS compliance checks, compiling README summaries, and executing the final repository version commit.
 
 ---
 
-## 2. 阶段七：对账与格式校验 (Verify & Polish)
-1. **引文编号核对**：检查正文引文 `[n]` 与参考文献列表是否完全匹配。
-2. **多媒体与链接核对**：
-   - 验证正文中所有的 Markdown 图片 `!["alt"](url "title")` 格式是否规范。
-   - 审计 `alt` 文本是否足够详尽（要求概括出核心数据以对 LLM 友好）。
-3. **Mermaid 语法复查**：
-   - 仔细复核所有 Mermaid 代码块，必须遵循防错规范（节点文本使用双引号包裹，禁用复杂 HTML 标签，节点 ID 禁用中文和特殊符号）。
+## 1. Phase 6: Adversarial Counter-Review (Self-Review)
+To avoid consensus bias, the Lead Agent (or a spawned `self` subagent) MUST conduct a rigorous, adversarial review of the drafted report:
+1. **Adversarial Audit**: Intentionally challenge the report's primary claims. Identify potential biases, assumptions, or oversights.
+2. **Vulnerability Mitigation**:
+   - Locate high-risk assertions supported by only a single source. Strengthen the evidence or adjust the confidence rating downward.
+   - Audit outdated references (e.g., policy updates older than 2 years or rapid news feeds older than 6 months in fast-moving domains).
+3. **Controversies Compilation**: Draft and append the `## Key Controversies & Adversarial Views` section at the end of the report to present the balanced counter-arguments.
 
 ---
 
-## 3. 看板结项与 README 汇总
-1. **更新 README**：主 Agent 将调研的核心结论、信源分布及最终结论摘要更新至项目根目录的 `README.md` 与 `README_zh-CN.md`。
-2. **状态标记**：将 `kanban/KANBAN.md` 中的状态更新为 `COMPLETED`。
+## 2. Phase 7: Verification & Formatting Polish (Verify & Polish)
+1. **Citation Registry Audit**: Cross-verify that all inline citation tags `[n]` in the text map perfectly to the bibliography list at the end of the report.
+2. **Visual & SMIS Audit (MANDATORY)**:
+   - Verify that all Markdown image tags `![alt](url "title")`, semantic HTML `<figure>` wrapper trees, and Mermaid blocks are formatted correctly.
+   - **Audit SMIS Compliance**: Ensure that every single visual and video element has a fully expanded, context-inferred, and highly analytical description embedded natively inside standard Markdown Alt-text (Pattern A) or standard semantic HTML figcaptions/summaries (Pattern B) in the correct adaptive language.
+   - **Verify HTML Integrity**: Check that all semantic inline-HTML tags (like `<figure>`, `<figcaption>`, `<details>`, `<summary>`) are correctly opened and closed, and use standard HTML tags (like `<b>`, `<i>`, `<a>`) rather than Markdown formatting inside them to ensure stable rendering.
+3. **Mermaid Anti-Error Check**: Re-parse and double-check all inline Mermaid syntax. Confirm that all complex node text is wrapped in double quotes and that no HTML tags are present within the Mermaid graph definitions.
 
 ---
 
-## 4. 最终封版 Git 自动提交 (Git Archive Commit)
-检查本地环境是否存在 Git，若可用，在项目根目录下执行自动提交：
+## 3. Project Packaging & README Summaries
+1. **README Updates**: Synthesize the core findings, domain parameters, citation breakdown, and conclusion highlights. Save/overwrite this summary in Silicon Valley English to the root directory's `README.md` and `README_zh-CN.md`.
+2. **Kanban Status Update**: Mark all phases as completed, and transition the project status to `COMPLETED` in `kanban/KANBAN.md`.
+
+---
+
+## 4. Final Silent Git Archive Commit 📌 [Silent Git Commit 3/3]
+If the Git CLI is active in the environment, run the final packaging commit silently to freeze the project state:
 ```powershell
 git add .
 git commit -m "stage: report-finalized"
 ```
-*如果 Git 命令执行失败，打印日志并警告，跳过该步。*
+*If the Git command fails or Git is missing, log a warning and complete the task without blocking.*
 
 ---
 
-## 5. 进度汇报格式
+## 5. Phase Completion Reporting Format
 `[P7 complete] Verification passed. README updated. Git Stage: report-finalized. Project status: COMPLETED.`

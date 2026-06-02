@@ -58,6 +58,7 @@ def main():
         "connectivity": {
             "google": check_network("https://www.google.com", "Google"),
             "bing": check_network("https://www.bing.com", "Bing"),
+            "baidu": check_network("https://www.baidu.com", "Baidu"),
             "europepmc": check_network("https://europepmc.org", "EuropePMC")
         },
         "git": check_git(),

@@ -1,70 +1,71 @@
-# Phase 5: 分章节流式追加写作与恢复 (Loop-Append & Checkpoint Resume)
+# Phase 5: Phased Section Drafting & Appending (Loop-Append & Checkpoint Resume)
 
-本阶段指导智能体如何采用分章节流式追加方式写入超长调研报告，并在中间截断时自动恢复续写。
-
----
-
-## 1. 写作大纲拆分与看板登记 (P4 衔接)
-在大纲设计阶段（P4），Lead Agent 必须将所有的报告章节标题，登记在 `kanban/KANBAN.md` 的 `## 4. 报告写作进度` 章节中：
-```markdown
-## 4. 报告写作进度
-- **已完成章节**:
-  (暂无)
-- **待完成章节**:
-  - [ ] Executive Summary
-  - [ ] 1. 政策文件梳理与准入要求
-  - [ ] 2. 半导体关键材料供需链冲击
-  - [ ] 3. 替代材料技术与成熟度评估
-  - [ ] 4. 供应链风控应对建议
-```
+This phase guides the Lead Agent in compiling and drafting the long-form research report section-by-section, invoking drawing skills, and appending files stream-by-stream while maintaining strict checkpoints.
 
 ---
 
-## 2. 分章节流式生成与追加循环 (Loop-Append)
-针对 `待完成章节` 列表中的每一个项目，顺序执行以下操作：
-
-### 2.1 上下文空间清理 (Context Optimization)
-- **释放记忆**：**禁止**将前述章节的详细文本内容一直堆积在当前会话的上下文记忆中。
-- **加载项控制**：每次只载入“大纲框架 + 当前章节特定的任务 findings 原始笔记 + 全局引用注册表”。
-- **目标**：保证 LLM 的单次响应专注于编写当前章节，防止触发最大输出 Token 限制。
-
-### 2.2 章节撰写与图文关联要求
-- 严格标记引用引文 `[n]`。
-- **图文强关联嵌入 (外部图表)**：必须读取全局引用注册表中的图片列表，通过对比图片的 `alt` 文本与当前段落事实，若语义高度匹配，才能将图片代码块直插正文。
-- **强制文本引导 (Contextual Anchoring)**：插入图片前，正文段落必须配有明确的过渡呼应语（如“如下方图表所示：”），严禁无上下文强行插图。
-- 图像降级与字数：无匹配图片则回落为带双引号保护的 Mermaid。单章控制在 400-800 字。
-
-### 2.3 追加写入与看板更新
-1. 将当前生成的章节内容，使用文件**追加写入**（`Append`）合并到 `report.md` 尾端。
-2. 修改 `kanban/KANBAN.md`：将当前章节移至 `已完成章节` 区域并标记为 `[x]`。
-3. **不要进行单章 Git 提交**，仅在内存和 KANBAN.md 中保持标记即可。
-4. 输出单章节状态日志：`[P5 drafting] section {index}/{total}: [SectionName] complete.`
+## 1. Context Optimization & Preparation
+To prevent context bloat and downstream LLM output truncation (avoiding single-response `max_output_tokens` limits):
+- **Memory Optimization**: **DO NOT** keep previously written draft chapters in active context.
+- **Lazy Loading**: For each section, load only: the core report outline, the specific subagent findings notes (`findings/task-*.md`) linked to this chapter, and the washed Global Citation Registry from KANBAN.md.
+- **Goal**: Maintain a tight, high-focus context window for the LLM to write a single premium, dense chapter (400-800 words) at a time.
 
 ---
 
-## 3. 中断与断点恢复机制 (Checkpoint Resume)
-如果程序在生成 Section 3 时由于网络或 token 耗尽崩溃退出：
-1. **重新载入**：当技能再次启动时，Lead Agent 自动读取 `kanban/KANBAN.md`。
-2. **断点比对**：
-   - 检查 `已完成章节` 列表。
-   - 检查 `report.md` 的内容是否完整到已完成章节的末尾。
-3. **断点续写**：
-   - 重新构建上下文：清理前两个章节的展开会话，直接定位到 `待完成章节` 里的第一项。
-   - 发起续写请求，继续向 `report.md` 尾部追加。
+## 2. Drafting & Visual Embedding Rules
+
+For each pending section in `KANBAN.md`, execute the drafting block:
+1. **Contextual Anchoring**: Never insert an image or diagram out of nowhere. Precede every media asset with a clear narrative transition or hook (e.g., *"As shown in the system architecture workflow below, the process flow is..."*).
+2. **Specialized Illustration Integration (doc-illustrator)**:
+   - If `doc-illustrator` is available, invoke it using its exact documented prompt-assembly and calling interface to generate the planned PNG (e.g., `assets/workflow_pipeline.png`).
+   - Wrap and embed the generated PNG using **SMIS specifications** (Pattern A for simple layouts, Pattern B for complex layouts).
+3. **Harvested Web Images Integration (Supporting Evidence)**:
+   - When a highly relevant web image harvested by subagents is mapped to the current section, embed it by directly copying its pre-washed SMIS block (either Pattern A or Pattern B) from `findings/task-*.md`.
+   - **Pattern A (Simple/Compact Visuals)**: Embed as a standard Markdown link with a highly descriptive, context-inferred Alt text containing data, metrics, and business takeaways:
+     `![【类型：图表类型】[数据事实描述](结合课题的推断性结论)](图片 Web URL "自解释标题")`
+   - **Pattern B (Complex/Video/Transcripts)**: Embed as standard semantic inline HTML wrappers:
+     ```html
+     <figure>
+       <img src="图片 Web URL" alt="【类型：图表类型】[数据事实描述](推断性结论)" />
+       <figcaption><b>图 {序号}: {自解释标题}</b> — {上下文关键事实佐证与深度业务推导}</figcaption>
+     </figure>
+     ```
+     Or for collapsible video transcripts:
+     ```html
+     <details>
+       <summary>🎬 <b>视频佐证：{视频标题}</b></summary>
+       <p>{视频画面与核心事实的详尽描述。若需超链接，请使用 <a href="链接">链接文本</a>}</p>
+     </details>
+     ```
+   - **CRITICAL HTML Rules**: Within inline-HTML wrappers, you MUST use standard HTML tags (e.g., `<b>`, `<i>`, `<a href="...">`) instead of Markdown formatting (`**`, `*`, `[]()`) to ensure stable rendering across all Markdown engines.
+4. **Mermaid Fallback**: If fallback was selected, write a clean, double-quote-protected inline Mermaid.js code block. You may wrap the Mermaid code block inside a `<figure>` and `<figcaption>` tag structure to add a clean description below it.
+5. **Language自适应 (Language Adaptive)**: The language of both the chapter text and all media description wrappers (Alt texts, figcaptions, summaries) MUST dynamically match the target adaptive language (Chinese for Chinese, English for English).
 
 ---
 
-## 4. 报告初稿完工与 Git 自动提交
-当所有待完成章节全部拼接完毕，并追加合并了 `## 参考文献` 之后：
-1. 更新 `kanban/KANBAN.md` 看板，标记阶段五已完成。
-2. 在项目根目录下执行自动提交：
+## 3. Chunk-then-Merge & KANBAN Checkpoints
+1. **Isolated Drafting**: Do NOT append directly to `report.md`. Write each freshly generated chapter to its own file in a `drafts/` directory (e.g., `drafts/chapter_1.md`, `drafts/chapter_2.md`). Ensure the file names contain the chapter sequence number so they sort correctly.
+2. Update `kanban/KANBAN.md`: move the drafted section to `Completed Sections` and mark it as `[x]`.
+3. Print a single-line progress log: `[P5 drafting] section {index}/{total}: [SectionName] saved to drafts.`
+4. Do NOT perform Git commits on every single chapter. Keep commits restricted to the three main lifecycle nodes.
+
+---
+
+## 4. Checkpoint & Crash Resume Mechanism
+If the execution is cut off (e.g., due to API timeout, network failure, or token exhaustion) while writing Chapter 3:
+1. **Reload**: When the skill is re-activated, the Lead Agent reads `kanban/KANBAN.md`.
+2. **Diff**: List files in the `drafts/` directory and verify they match the `Completed Sections` in the Kanban.
+3. **Resume**: Clear historical chat context, load the first `Pending Section` from the Kanban checklist, and resume writing the missing standalone chapter files.
+
+---
+
+## 5. Report Compilation Completion & Git Commit
+Once all outline chapters and the `## 参考文献 / References` section are fully drafted in the `drafts/` directory:
+1. **Merge**: Execute `python scripts/merge_chapters.py` from the project root to automatically concatenate all draft chapters sequentially into the final `report.md`.
+2. Mark Phase 5 as completed in `kanban/KANBAN.md`.
+2. Execute the silent Git commit:
    ```powershell
    git add .
    git commit -m "stage: draft-report-written"
    ```
-   *如 Git 不可用，打印日志警示，直接跳过。*
-
----
-
-## 5. 进度汇报格式
-`[P5 complete] Segmented draft report completed and merged. Git Stage: draft-report-written.`
+   *If the Git CLI is unavailable, log a warning and bypass without throwing an error.*

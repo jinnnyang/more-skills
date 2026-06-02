@@ -1,127 +1,140 @@
-# Phase 0: 环境探测与 Grill-Me 交互需求对齐 (Setup & Interactive Intake)
+# Phase 0: Setup, Probing, & Interactive Intake
 
-本阶段指导主智能体（Lead Agent）检查运行环境、主动探测工具技能与已有调研项目，并通过“Grill-Me”风格的精英交互，彻底摸清用户需求、完成项目归集与版本控制初始化。
+This phase guides the Lead Agent through environmental validation, progressive tool and history discovery, and elite "Grill-Me" interactive alignment to map boundaries, initialize the workspace, and setup version control.
 
 ---
 
-## 1. 前置环境、依赖核对与系统路径感知 (Environment Check)
-
-在进入任何任务前，必须：
-1. **自动执行检测脚本**：
+## 1. Environment Verification & OS Path Ingestion
+Before executing any research tasks, the Lead Agent MUST:
+1. **Run Verification Script**:
    ```bash
    python scripts/check_env.py
    ```
-   * **核心阻断项**：若网络全部失败或当前目录无写权限，立即报错停止。
-   * **非阻断项**：若 Git 未安装，打印 Warning 警告“本地 Git 未可用，将自动跳过版本追踪提交”，但**绝不能阻断**。
-2. **感知操作系统 HOME 路径**：
-   * 必须通过执行系统命令（如 Windows 的 `echo %USERPROFILE%` 或 Linux/Mac 的 `echo $HOME`）获取真实的系统家目录物理路径，并在给用户的回复中显式打印该绝对路径。
-   * **重要**：所有深研报告的底层**默认存储归集路径必须指定为** `$HOME/projects/`。
+   - *Blocking Errors*: If network checks fail entirely or the current working directory lacks write permissions, stop and report the error immediately.
+   - *Non-blocking Warnings*: If Git is missing, print a warning: `"Local Git CLI is not found; skipping silent version-control tracking commits."` **DO NOT** block execution.
+2. **Resolve OS Path Variables**:
+   - Ingest the actual physical path of the user's home directory (e.g., run `echo %USERPROFILE%` on Windows, or `echo $HOME` on macOS/Linux). Print this absolute path in your first reply to the user.
+   - **Default Project Storage**: All deep-research projects MUST default to being created and gathered under the `$HOME/projects/` directory.
 
 ---
 
-## 2. 可用工具、技能与历史项目主动探测 (Progressive Discovery)
-
-在与用户进行 Intake 沟通前，Lead Agent **必须主动执行扫描**，杜绝黑盒执行：
-
-1. **MCP 工具探测**：检查已注册的检索/爬取工具（如 `bing_search`, `read_url_content` 等）。
-2. **专属技能探测**：检查工作区兄弟技能（如 `pubmed-database`, `fact-checker`）。
-3. **已有调研项目扫描 (History Discovery)**：
-   - 扫描默认库 `$HOME/projects/` 下的子文件夹。如果包含 `kanban/KANBAN.md`，则判定为历史调研项目。
-   - 提取其项目名称与主题，**最多保留 10 条**结果。
-4. **意图路由判定**：
-   - 若用户触发技能时输入了 `<主题>`，通过关键词相似度比对，判断该主题是否与上述探测到的某一已有项目匹配（延续性研究）。若不匹配，则为新项目。
+## 2. Progressive Tool & History Discovery
+To avoid black-box execution, the Lead Agent **MUST actively discover** active tools and historical data before formulating the intake response:
+1. **MCP Tool Discovery**: Discover active search and retrieval tools (e.g., `bing_search`, `read_url_content`).
+2. **Sibling Skill Discovery**: Check for active neighboring domain-specific skills (e.g., `pubmed-database`, `fact-checker`, or `doc-illustrator`).
+3. **Historical Project Discovery**:
+   - Scan subdirectories under the default path `$HOME/projects/`. If a subdirectory contains a `kanban/KANBAN.md`, classify it as a historical research project.
+   - Extract the project names and core topics. Limit the list to **at most 10 results**.
+4. **Intent Routing Analysis**:
+   - If the user provided a `<Topic>` in the initial request, perform keyword matching against discovered history folder names to determine if this is a **Continuation Research** request (existing project) or a **New Research** request.
 
 ---
 
-## 3. Grill-Me 精英交互与无主题推荐 (Interactive Intake)
+## 3. Pre-flight Checklist Execution & Interactive Intake
+Before formulating a response, the Lead Agent MUST evaluate and print the first two modules (1/5 & 2/5) of the `pre_flight_cognitive_checklist.md` directly into the chat, demonstrating active "Skills over Primitives" evaluation. Then, run a sharp 1-2 round Q&A with the user.
 
-Lead Agent 必须采用 Grill-Me 风格，向用户发起 1-2 轮针锋相对的互动对齐，彻底澄清研究边界。
-
-### A. 无主题输入时的推荐面板
-若用户未提供主题，智能体提供如下面板：
+### A. Intake Template: No Initial Topic Provided
+If the user starts the skill without specifying a research topic, respond with:
 ```markdown
-您好！我是 Deep-Research 智能体。已为您扫描当前运行环境：
-- **默认报告存储库**：`$HOME/projects/` (物理路径: [上文获取的绝对路径])
-- **可用专业技能**：[列出探测到的工具]
+### 🛫 Pre-flight Verification
+- [x] **Skill Audit**: Evaluated `<skills>`. Highly relevant domain skills found: `[AGENT MUST EXTRACT & WRITE EXACT SKILL NAMES HERE (e.g. pubmed-database, finance-tool), OR 'None']`.
+- [x] **Data Triage**: Checked `$HOME/projects/`. Will prioritize MCP/Proprietary data before primitive web searches.
 
-### 📂 本地已发现的历史调研项目 (可在此基础上延续研究)
-1. `project-a` (主题: ...)
-2. `project-b` (主题: ...)
+Hello! I am your Deep-Research Agent. I have analyzed your local environment:
+- **Default Research Registry**: `$HOME/projects/` (Physical Path: [Resolved Absolute Path])
+- **Active Domain Skills Discovered**: [List tools/skills, e.g., doc-illustrator, fact-checker]
 
-### 💡 热门追踪推荐 (AI 推荐的新兴课题)
-- 推荐 A: [模型自主推荐的热点]
-- 推荐 B: [模型自主推荐的热点]
+### 📂 Historical Research Projects Found (Select to continue research)
+1. `project-a` (Topic: ...)
+2. `project-b` (Topic: ...)
 
-【Grill-Me 追问】
-请问您是希望开启全新主题，还是在历史项目基础上挖掘？如果是新主题，这份报告的最终受众是谁（科普/决策）？我们是否需要调用本地已有的 [某个历史项目] 作为跨界对比数据？
+### 💡 Trending Research Suggestions (AI Generated Tech Topics)
+- Suggestion A: [AI-curated hot topic]
+- Suggestion B: [AI-curated hot topic]
+
+【Grill-Me Q&A Alignment】
+1. Would you like to start a brand new topic, or continue an existing historical project?
+2. Who is the target audience for this report (Executive Decision Maker vs. Technical R&D)?
+3. **Adaptive Output Language**: I will automatically match my output language to your primary language (e.g., Chinese if you type in Chinese, English if in English). Let me know if you want to override this and specify a different target language!
 ```
 
-### B. 带主题输入的确认面板
-若判定为新主题：
+### B. Intake Template: Topic Provided (New Research)
+If a new topic is identified from the user's initial prompt, respond with:
 ```markdown
-您好！环境已就绪。
-- **默认报告存储库**：`$HOME/projects/` (物理路径: [上文获取的绝对路径])
-- **可用专业技能**：[列出]
+### 🛫 Pre-flight Verification
+- [x] **Skill Audit**: Evaluated `<skills>`. Target skills to activate: `[AGENT MUST EXTRACT & WRITE EXACT SKILL NAMES HERE]`.
+- [x] **Data Triage**: Checked `$HOME/projects/`. Will prioritize MCP/Proprietary data before primitive web searches.
 
-**研究初始化方案**：
-- **项目目录命名**：`[kebab-case-name]` (将创建于 `$HOME/projects/[kebab-case-name]`)
-- **探索参数**：深度 Depth = 3，宽度 Breadth = 2
+Hello! Environment initialized.
+- **Default Research Registry**: `$HOME/projects/` (Physical Path: [Resolved Absolute Path])
+- **Active Domain Skills Discovered**: [List active tools/skills]
 
-【Grill-Me 追问】
-在正式开始前，请确认这个默认存储路径是否合适？另外，为了让我的洞察更敏锐，这份报告的核心受众是高管决策层还是技术研发端？是否需要与您本地已有的 [项目 A] 进行关联对比？
+**Proposed Research Parameters**:
+- **Project Folder**: `$HOME/projects/[kebab-case-name]`
+- **Recursive Depth Settings**: Depth = 3, Breadth = 2
+- **Output Language**: Automatically adapting to your input language (e.g., Chinese/English).
+
+【Grill-Me Q&A Alignment】
+To ensure maximum precision and sharpness in this report:
+1. Is the proposed storage registry path and kebab-case directory name correct?
+2. Is this report intended for high-level executive decision-making or deep technical R&D?
+3. Should we draw cross-domain references or compare data with your existing local project [Project A]?
 ```
 
-**重点：智能体必须根据用户的回答调整后续逻辑与 `KANBAN.md`，禁止在未与用户确认存储路径和受众前自顾自直接生成。**
+**Rule**: You MUST adjust your downstream planning and `KANBAN.md` based on user answers. Do NOT start planning or fetching before the user confirms the storage path, target audience, and language.
 
 ---
 
-## 4. 项目归集初始化与 Git 延续标记 (Project Initialization)
+## 4. Project Directory & Git Initialization
+Once aligned, navigate to the target directory `$HOME/projects/[project-name]` and run the corresponding setup:
 
-交互确认后，进入 `$HOME/projects/[项目名]` 目录操作：
+### Pattern A: New Research Project
+1. If the directory does not exist, create it and run `git init` inside it.
+2. Initialize subfolders: `assets/`, `findings/`, `tasks/`, `plan/`, `kanban/`.
+3. Generate the initial `KANBAN.md` (see Section 5), completing Phase 0.
 
-### 模式 A：全新调研项目
-1. 若目录不存在，则创建目录并在内部执行 `git init`。
-2. 创建基础子文件夹：`assets/`, `findings/`, `tasks/`, `plan/`, `kanban/`。
-3. 生成 `KANBAN.md`（见第 5 节），完成 P0。
-
-### 模式 B：延续性研究 (Continuation Research)
-若判定在已有项目上续写，直接进入该工作目录：
-1. **打底基线 Tag (Base Tag)**：
-   运行 `git tag -a v[X.0.0]-base -m "Prior to new round"` 标记现有历史状态。如果之前没有 tag，默认为 `v1.0.0-base`。
-2. **归档旧看板 (Kanban Archiving)**：
-   读取已有的 `kanban/KANBAN.md`，将旧的“阶段生命周期进度”和“任务分配板”全部剪切，统一归入底部 `## 历史归档 (Archive)` 小节下，然后在原位置重置当前最新进度的 Checklist。
-3. **工作区净空 (Workspace Clearing)**：
-   在确保打完 Tag 的前提下，运行命令**清空删除** `findings/` 和 `tasks/` 文件夹下的旧 Markdown 中间产物文件（防止历史子任务残留并污染新报告，旧数据已安全封存在 Git 中）。随后完成 P0。
+### Pattern B: Continuation Research
+If writing a follow-up or expansion to an existing project:
+1. **Base Version Tagging**:
+   Run `git tag -a v[X.0.0]-base -m "Prior to new round"` to lock down the historical state. If no tag exists, default to `v1.0.0-base`.
+2. **KANBAN.md Archiving**:
+   Open `kanban/KANBAN.md`. Cut the previous "Phased Lifecycle Progress" and "Taskboard" sections and paste them into the `## 6. Historical Archive` section at the bottom. Re-initialize the active checklists at the top.
+3. **Workspace Purging**:
+   Having secured the history via Git tags, **permanently delete/purge** all old Markdown files inside the `findings/` and `tasks/` directories. This prevents old subagent results from polluting or blending into the new research round. Complete Phase 0.
 
 ---
 
-## 5. 初始 Kanban 状态结构 (`kanban/KANBAN.md`)
+## 5. Initial Kanban Schema (`kanban/KANBAN.md`)
 
 ```markdown
-# 调研项目看板: [项目命名]
+# Research Kanban: [project-name]
 
-## 1. 项目基本信息
-- **调研主题**: [主题]
-- **研究边界与受众**: [来自 Grill-Me 交互明确的约束]
-- **AS_OF 截止时间**: YYYY-MM-DD
-- **前置交叉引用**: [如果明确关联，填入其他项目相对路径]
+## 1. Project Information
+- **Research Topic**: [Topic]
+- **Target Audience & Boundaries**: [Aligned parameters from Grill-Me]
+- **AS_OF Cutoff Date**: YYYY-MM-DD
+- **Target Output Language**: [Adaptive (Chinese/English/Other)]
+- **Cross-References**: [Relative path to other local projects, if any]
 
-## 2. 阶段生命周期进度 (Current Round)
-- [x] P0: 环境初始化与交互式 Intake
-- [ ] P1: 调研任务板规划 (TODO)
-- [ ] P2: 子任务分发与抓取 (TODO)
-- [ ] P3: 文献治理与多媒体过滤 (TODO)
-- [ ] P4: 大纲锁骨架与绘图规划 (TODO)
-- [ ] P5: 分章节流式追加写作 (TODO)
-- [ ] P6: 反方自我审查纠错 (TODO)
-- [ ] P7: 参考文献核对与归档发布 (TODO)
+## 2. Phased Lifecycle Progress
+- [x] P0: Setup, Probing, & Interactive Intake (Completed)
+- [ ] P1: Task Decomposition & KANBAN Setup (TODO)
+- [ ] P2: Subagent Dispatch & Recursive Exploration (TODO)
+- [ ] P3: Citation Washing & Media MITTS Audit (TODO)
+- [ ] P4: Outline Design & Visualization Planning (TODO)
+- [ ] P5: Segmented Drafting & Stream-Appending (TODO)
+- [ ] P6: Counter-Review & Bias Auditing (TODO)
+- [ ] P7: Verification, Archiving, & Packaging (TODO)
 
-## 3. 任务分配板
-(P1 阶段写入)
+## 3. Taskboard
+(Populated during Phase 1)
 
-## 4. 报告写作进度 (P5 启用)
-- **草稿目标文件**: report.md
+## 4. Report Outline & Progress (P5 Enabled)
+- **Draft Output File**: report.md
 
-## 历史归档 (Archive)
-[仅延续性研究特有：存放历次迭代的旧 Kanban 进度]
+## 5. Global Citations & Media Registry
+(Populated during Phase 3)
+
+## 6. Historical Archive
+[Applicable for Continuation Research: Stores old Kanban checklists and progression rounds]
 ```

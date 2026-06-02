@@ -1,40 +1,41 @@
-# Phase 4: 报告大纲设计与绘图规划 (Evidence-Mapped Outline)
+# Phase 4: Outline Mapping & Visual Planning (Evidence-Mapped Outline)
 
-本阶段指导主智能体（Lead Agent）结合已清洗的文献注册表与各子任务 notes，构建结构化的证据映射大纲，并规划正文的可视化图表。
-
----
-
-## 1. 结构化大纲设计规则 (Topic-First Outline)
-
-1. **主题优先，而非任务顺序**：大纲设计应围绕调研课题的逻辑脉络组织（如背景、产业链条、核心争议、技术路线比较、局限性等），严禁按照“任务 A 发现、任务 B 发现”等子任务顺序进行机械平铺。
-2. **证据与引文映射 (Evidence Mapping)**：大纲中每个章节段落必须明确标注其拟引用的子任务事实（Findings）与全局文献注册表编号（[1], [2] 等）。
-3. **时效性校验 (Recency Checks)**：核对每个章节拟采用的数据发布时间与 P0 设定的 `AS_OF` 截止日期的间隔。对时效敏感性较高的行业/政策数据，若超过 1-2 年必须在大纲中进行标记，以便在撰写时进行置信度下调说明。
+This phase guides the Lead Agent in designing a logical, topic-first research outline mapped to findings, and planning the layout and textual metadata (MITTS) for all planned diagrams.
 
 ---
 
-## 2. 数据可视化与绘图规划 (Diagram Planning)
-
-根据 P3 阶段做出的“数据可视化决策”（即环境中是否检测到可用绘图技能）：
-- **若有绘图工具**：规划图表生成的输出文件名，例如 `assets/chart_market_share.png`。设计绘图所用的核心数据与指令，在 P5 章节撰写时调用绘图工具生成 PNG 并使用 `./assets/文件名.png` 相对路径嵌入。
-- **若无绘图工具 (Mermaid 回落)**：规划拟插入的 Mermaid 图表类型（如 flowchart TD 流程图，gantt 甘特图，gitGraph 等），并预设防报错的双引号包裹节点文本。
+## 1. Topic-First Outline Design Rules
+1. **Thematic Over Task-Order**: Do NOT structure the outline based on "Task A Findings, Task B Findings" chronologically. Organize it around the logical thesis (e.g., Background -> Tech Bottlenecks -> Industry Chain -> Competitive Scenarios -> Strategic Recommendations).
+2. **Evidence Mapping**: Every section and subsection in the outline MUST explicitly list the subagent findings (`Task A-Finding 2`, etc.) and the global citation numbers (`[1]`, `[3]`) that support its facts.
+3. **Recency Audit**: Verify the publication dates of the evidence against the `AS_OF` target defined in Phase 0. Highlight highly time-sensitive metrics that are over 1 year old, and tag them for credibility adjustment during drafting.
 
 ---
 
-## 3. 看板登记与大纲格式
+## 2. Diagram & SMIS Planning (CRITICAL)
+Based on the visualization decision from Phase 3, plan the visual inserts and pre-draft their **SMIS wrappers**:
+- **If specialized drawing is active (doc-illustrator)**: Plan the target PNG filename (e.g., `assets/chart_market_share.png`). Outlines of core data, flows, and the **judgmental conclusion** must be pre-drafted to be embedded as either the native Alt-text (Pattern A) or wrapped inside semantic HTML `<figure>` / `<figcaption>` wrappers (Pattern B) in P5.
+- **If inline Mermaid is active (Fallback)**: Plan the Mermaid diagram type (flowchart, sequence, mindmap). Pre-draft the structural nodes using standard anti-error rules (double quotes for labels, unique simple IDs), and plan its corresponding `<figure>` HTML wrapper and description.
 
-大纲构建完成后，必须将其转换为待写作的章节清单（Pending Sections），登记到项目看板 `kanban/KANBAN.md` 中。这对于 P5 阶段执行流式分段追加与断点恢复至关重要。
+---
 
-### 大纲示例：
+## 3. 看板登记与大纲格式 (Kanban Registry & Outline Format)
+Register the designed outline and visual plan as a checklist of `Pending Sections` in `kanban/KANBAN.md`.
+
+### Kanban Outline Example (Chinese Adaptive):
 ```markdown
+## 4. 报告写作大纲与进度 (Report Outline & Progress)
+
 ### 待撰写章节清单 (Pending Sections)
-- [ ] 章节 1：稀土全球供应链格局及中国地位
+- [ ] 章节 1：稀土全球供应链格局及中国垄断地位
   - 引文来源：[1][2][5]
-  - 支撑事实：Task A-Finding 2, Task B-Finding 4
-  - 图表规划：生成 `./assets/supply_chain_share.png` (全球份额占比饼图)
+  - 支撑证据：Task A-Finding 2, Task B-Finding 4
+  - 图表规划：生成 `./assets/supply_chain_share.png` (全球开采/冶炼份额占比饼图)
+  - SMIS规划：使用 Pattern A 模式，Alt文本内包含图表类型为占比饼图、中国冶炼占89%垄断数据、以及推导西方短期无法脱钩需保持合作的结论。
 - [ ] 章节 2：主要出口管制政策及对企业合规冲击
   - 引文来源：[3][4]
-  - 支撑事实：Task C-Finding 1, 3
-  - 图表规划：内联 Mermaid 流程图 (展示申报与获批流程)
+  - 支撑证据：Task C-Finding 1, 3
+  - 图表规划：内联 Mermaid 流程图 (展示双向申报与审批合规流程)
+  - SMIS规划：使用 Pattern B 模式，用 `<figure>` 标签包裹，并在 `<figcaption>` 内写入双向申报审批流程，包含从申请至终审的五大关卡，并得出合规审核周期将延长至60天以上的预判性结论。
 ```
 
-*注：本阶段不需要触发 Git 自动提交。*
+*Note: Phase 4 does not require triggering a silent Git commit.*
