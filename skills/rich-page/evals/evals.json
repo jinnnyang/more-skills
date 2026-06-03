@@ -1,0 +1,31 @@
+{
+  "skill_name": "rich-page",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Write an article about: How AI coding assistants (like Gemini/Claude) are changing developer workflows. Use the feidieshuo-style.md as the style guideline.",
+      "expected_output": "A 2000-word article in feidieshuo style about AI coding assistants, following the 631 track structure with 4-5 images (detailed alt text and titles).",
+      "files": [],
+      "expectations": [
+        "The article is at least 1500 words long",
+        "The article contains 4-5 images formatted as ![alt](url \"title\")",
+        "Images have descriptive prompt-like alt texts (>30 chars)",
+        "It uses the 631 ratio (approx 60% dry content, 30% hook, 10% conversion)",
+        "The prose follows feidieshuo-style.md guidelines"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "Write an article about: A developer's journey leaving a big tech company to build a solo indie product. Use the feidieshuo-style.md as the style guideline.",
+      "expected_output": "A 2000-word story in feidieshuo style about an indie developer's transition, following the 361 track structure with 4-5 images (detailed alt text and titles).",
+      "files": [],
+      "expectations": [
+        "The article is at least 1500 words long",
+        "The article contains 4-5 images formatted as ![alt](url \"title\")",
+        "Images have descriptive prompt-like alt texts (>30 chars)",
+        "It uses the 361 ratio (approx 30% dry content, 60% hook, 10% conversion)",
+        "The prose follows feidieshuo-style.md guidelines"
+      ]
+    }
+  ]
+}
