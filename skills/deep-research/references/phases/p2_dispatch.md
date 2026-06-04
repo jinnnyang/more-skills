@@ -11,7 +11,15 @@ Before triggering any web search queries, if a subtask's objective contains a **
 
 ---
 
-## 2. Recursive exploration Loop (Rinse-and-Repeat)
+## 2. Workspace as Long-Term Memory (Context Optimization)
+To avoid context window overflow in super-large research projects, all agents (Lead Agent and Subagents) MUST treat the workspace as their definitive long-term memory.
+- **Shared Directories**: State and findings are stored in a flat directory structure: `memories/`, `findings/`, `clues/`, and `hypotheses/`.
+- **Periodic Sync**: Agents MUST proactively and periodically (e.g., every few recursive loop iterations) read these folders to understand the global state, decide their next actions, and avoid duplicate work.
+- **Context Dropping**: After dumping insights to the shared directories, agents MUST intentionally drop older, low-level context (like raw scraped pages) to preserve their working memory.
+
+---
+
+## 3. Recursive exploration Loop (Rinse-and-Repeat)
 To break out of "information silos" and bypass search engine biases, each subagent executes an adaptive deep-dive recursion loop:
 
 ```
@@ -35,11 +43,11 @@ To break out of "information silos" and bypass search engine biases, each subage
 
 ---
 
-## 3. Dispatch Routing Modes
+## 4. Dispatch Routing Modes
 
 ### Mode A: Subagent Mode (Recommended)
 - The Lead Agent dispatches subtasks to parallel `research` subagents, passing the custom `Depth` and `Breadth` parameters.
-- Subagents load the standard [subagent_prompt.md](../subagent_prompt.md), execute in isolated sandboxes, and write structured notes directly to `findings/task-*.md`.
+- Subagents load the standard [subagent_prompt.md](../subagent_prompt.md), execute in isolated sandboxes, and write structured notes directly to the shared folders (`findings/task-*.md`, `clues/task-*.md`, etc.).
 
 ### Mode B: Monolithic Fallback (Degraded Execution)
 - If subagents are unavailable, the Lead Agent sequentially executes the recursive search.
@@ -47,7 +55,7 @@ To break out of "information silos" and bypass search engine biases, each subage
 
 ---
 
-## 4. Source Governance & SMIS Gathering
+## 5. Source Governance & SMIS Gathering
 All recorded literature and media assets MUST adhere to [research_notes_format.md](../research_notes_format.md).
 * **Media Asset Registry**: Do NOT download binary image files. **ONLY record** their original Web URLs.
 * **Initial SMIS Drafting**: Subagents MUST pre-draft a highly detailed, context-inferred description directly encapsulated inside standard Markdown Alt-text (Pattern A) or standard semantic HTML wrappers (Pattern B) using the Semantic Media Integration Standard (SMIS).
@@ -55,16 +63,17 @@ All recorded literature and media assets MUST adhere to [research_notes_format.m
 
 ---
 
-## 5. Information Density & Independent Agent Insights
-To prevent reports from becoming chaotic data dumps, every `findings/task-{id}.md` file MUST conform to these tight budgets:
+## 6. Information Density & Independent Agent Insights
+To prevent reports from becoming chaotic data dumps, every markdown file in the shared folders MUST conform to these tight budgets:
 - **## Research Findings (Findings)**: At most **10 core objective facts**, formatted as standalone single sentences with clear citation brackets (e.g., `[1]`).
 - **## Deep Read Notes (Notes)**: Synthesize only 2 or 3 critical papers. Limit description to at most 4 lines per source.
 - **## Agent Insights (Insights) [MANDATORY]**:
   - Based on the gathered facts and comparison data, **compile 2 or 3 independent, logical, and judgmental deductions** (e.g., supply chain risk rating, market bottleneck foresight, or tech maturity prognosis).
+  - Write these explicitly into `hypotheses/` or `clues/` to share with the team.
   - Explicitly distinguish objective facts from the agent's independent deductions.
   - *(Note: For continuation research, writing to these findings files cleanly overwrites the old baseline with a fresh, clean dataset.)*
 
 ---
 
-## 6. Kanban Registry
+## 7. Kanban Registry
 Upon completion of all subtasks, the Lead Agent marks them as completed in `kanban/KANBAN.md`. Phase 2 does not require executing a silent Git commit.

@@ -64,11 +64,12 @@ Lead Agent (Main Router Entry - Minimal Context Footprint)
 ## 🚀 Execution Core Principles
 
 1. **Lazy Loading**: Only read a phase's reference file when transitioning into it. Do NOT clutter the context by loading unrelated phase instructions in advance.
-2. **Environment & History Probing**: In P0, discover active drawing/illustration skills (like `doc-illustrator`), fact-checkers, and historic projects in `$HOME/projects/`. Use Grill-Me interaction to align on audience, depth, and cross-domain references.
-3. **Adaptive Deep Digging**: In P2, restrict subagents with Breadth and Depth parameters, allowing them to recursively follow citations and pool knowledge.
-4. **SMIS (Semantic Media Integration Standard)**: All visual and media assets (crawled web images, generated PNGs, or videos) MUST carry a rich, context-inferred description directly inside standard Markdown Alt-text (`![alt](url "title")`), or wrapped inside standard semantic HTML elements (like `<figure>`, `<figcaption>`, `<details>`, `<summary>`) to ensure full visual-less accessibility, clean Markdown layouts, and native downstream LLM comprehension.
-5. **Stream-Appending with Resume Support**: In P5, compile and append chapters one by one to `report.md`. Track progress in `KANBAN.md`. If a crash occurs, resume seamlessly from the first pending chapter.
-6. **Non-blocking Git Integration**: Silent Git commits are restricted to **three primary lifecycle commits** and run silently if the Git CLI is active. If Git is unavailable, log a warning and continue without throwing an error.
+2. **Workspace as Long-Term Memory (Context Optimization)**: For super-large research projects, agents (Lead and Subagents) MUST atomize tasks and drop older context to avoid memory overflow. All agents MUST share states via a flat directory structure (`memories/`, `findings/`, `clues/`, `hypotheses/`). Agents should periodically read these folders to sync state, and explicitly write any valuable discoveries or guesses into them as Markdown files.
+3. **Environment & History Probing**: In P0, discover active drawing/illustration skills (like `doc-illustrator`), fact-checkers, and historic projects in `$HOME/projects/`. Use Grill-Me interaction to align on audience, depth, and cross-domain references.
+4. **Adaptive Deep Digging**: In P2, restrict subagents with Breadth and Depth parameters, allowing them to recursively follow citations and pool knowledge.
+5. **SMIS (Semantic Media Integration Standard)**: All visual and media assets (crawled web images, generated PNGs, or videos) MUST carry a rich, context-inferred description directly inside standard Markdown Alt-text (`![alt](url "title")`), or wrapped inside standard semantic HTML elements (like `<figure>`, `<figcaption>`, `<details>`, `<summary>`) to ensure full visual-less accessibility, clean Markdown layouts, and native downstream LLM comprehension.
+6. **Stream-Appending with Resume Support**: In P5, compile and append chapters one by one to `report.md`. Track progress in `KANBAN.md`. If a crash occurs, resume seamlessly from the first pending chapter.
+7. **Non-blocking Git Integration**: Silent Git commits are restricted to **three primary lifecycle commits** and run silently if the Git CLI is active. If Git is unavailable, log a warning and continue without throwing an error.
 
 ---
 
