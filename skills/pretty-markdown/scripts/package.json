@@ -1,0 +1,22 @@
+{
+  "name": "pretty-markdown-scripts",
+  "version": "1.0.0",
+  "description": "Scripts for pretty-markdown skill",
+  "main": "cli.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "format": "tsx cli.ts"
+  },
+  "dependencies": {
+    "md2ast": "^0.0.1",
+    "dotenv": "^16.4.5",
+    "pangu": "^4.0.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/pangu": "^4.0.0",
+    "tsx": "^4.7.1",
+    "typescript": "^5.4.3"
+  }
+}

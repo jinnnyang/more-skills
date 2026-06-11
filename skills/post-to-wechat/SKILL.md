@@ -82,9 +82,37 @@ image_generation:
 
 ---
 
-## 🎨 Workflow 1: Readability Cover & Illustration Generation
+## 🧠 Strategic Operations & Content Planning (WeChat Native)
 
-Before formatting the article, analyze the markdown to identify opportunities to generate visual aids (cover and in-article illustrations) to enhance readability.
+Before drafting or formatting, the agent acting in an operational or publisher role **MUST** adhere to the following top-level strategies designed specifically for the WeChat ecosystem:
+
+### 1. Subscriber Persona & Dynamic Tagging
+- Maintain detailed subscriber personas. Utilize WeChat's tag management to segment users based on behavior (e.g., interacted with a specific poll, activated mini-programs) for targeted future broadcasts.
+
+### 2. Content Pillars & 60/30/10 Golden Ratio
+- **Core Pillars**: Establish 4-5 core content themes mapped to the WeChat custom menu, acting as a mini-homepage index.
+- **60% Value Content (干货)**: Focus on deep insights and practical value to capture "Search" (微信搜一搜) long-tail traffic and trigger social recommendations (看一看).
+- **30% Interactive & Community (互动)**: Use comment hooks, polls, and "Star/在看" reminders to boost account engagement weight in the WeChat timeline algorithm.
+- **10% Brand & Promotion (推广)**: Contextually embed Mini-program cards or promotional links without disrupting the reading flow.
+
+### 3. Business Metrics Optimization Targets
+- **Open Rate (打开率) 30%+ (CRITICAL THRESHOLD)**: **A mediocre or poor cover image will drastically reduce readers' interest in clicking (打开率), directly destroying the article's traffic potential.** The cover image is the single most critical factor in the user's split-second decision to tap. You MUST treat the cover design as a premium psychological hook, matching a high-impact title to trigger intense curiosity, emotional resonance, or professional aspiration. Always utilize a stunning, high-end 6-dimensional palette and design (2.35:1 ratio).
+- **Read Completion Rate (完读率) 50%+**: Strictly enforce mobile-friendly readability (Golden 3-second hook, generous line spacing, visual breathing room, $\le 3$ lines per paragraph).
+- **Mini-program Activation (小程序激活率) 40%+**: Contextually embed Mini-program cards at the exact moment the user's pain point is activated, minimizing click paths.
+
+### 4. Boundaries & Security (Red Lines)
+- The strategy/publisher agent strictly handles top-level planning, formatting, and invoking publishing APIs. It does **NOT** manually operate the account frontend, store payment details, or handle highly sensitive resources. 
+
+---
+
+## 🎨 Workflow 1: Premium Cover Design & In-Article Illustration Generation
+
+Before formatting the article, analyze the markdown to identify opportunities to generate visual aids (cover and in-article illustrations) to enhance readability and maximize traffic potential.
+
+### 🚨 The "Click-or-Die" WeChat Cover Principle (CRITICAL)
+*   **The 0.5-Second Filter**: In the WeChat feed, users decide whether to read your article in under 0.5 seconds. The cover image occupies **80% of the visual space** in their timeline. A cheap, generic, or AI-hallucinated low-quality cover guarantees a dead article.
+*   **High-End Visual Metaphors**: Never use boring stock photos, cluttered corporate graphics, or standard flowcharts as covers. Instead, design a clean visual metaphor that reflects the article's soul (e.g., an elegant minimal key unlocking a glowing digital vault, rather than a generic photo of a computer).
+*   **Aesthetic Discipline**: Maintain generous whitespace (40-60% breathing room), a single strong visual anchor (centered or offset left), and absolute typographical clarity. Avoid text collisions with background details.
 
 ### WeChat Visual Hierarchy Rules (Mandatory)
 *   **Paragraph Limit**: Every paragraph **MUST** be $\le 3$ lines on mobile screens, with a full blank line separator.
@@ -97,11 +125,19 @@ When rendering cover or in-article illustrations, the agent **MUST** prioritize 
 2. **Native Tooling**: Check if the agent environment exposes a native image generation tool (e.g., `generate_image`). If so, invoke it directly.
 3. **Prompt and Ask**: If no image generation skill or tool is registered, ask the user how to generate the image (do **not** write raw SVG or HTML art as a replacement).
 
-### Step 1.1: Generate Cover Image
-1. **Cover Dimensions**: Must use **2.35:1 aspect ratio** (or `--aspect 2.35:1`) for WeChat top-banner cover images, or **1:1** for secondary covers.
-2. **Visual Content**: Create a minimal visual metaphor representing the article's core theme. Avoid drawing realistic humans; prefer clean vector icons, shapes, or stylized landscapes.
-3. **Write Prompt**: Save the image generation prompt to `{article_dir}/prompts/cover.md` before invoking the generator.
-4. **Generate & Auto-Compress**: Call the image generator. If the output image file size exceeds `max_cover_size_mb` (default 2.0MB), compress it using the compressor script:
+### Step 1.1: Generate Cover Image (6-Dimensional Design & Psychological Hook)
+Leverage the advanced cover generation frameworks located in `references/cover/` to craft a premium, high-impact masterpiece.
+1. **Establish the Visual Metaphor & Psychological Hook**: Analyze the core thesis of the article. Determine a high-end visual metaphor and a psychological trigger (curiosity, gain, awe, or professional pride) that fits.
+2. **Determine 6 Dimensions**: Analyze the article to select the appropriate combination of:
+   - **Type**: hero, conceptual, typography, metaphor, scene, minimal
+   - **Palette**: warm, elegant, cool, dark, earth, vivid, pastel, mono, retro, duotone, macaron
+   - **Rendering**: flat-vector, hand-drawn, painterly, digital, pixel, chalk, screen-print
+   - **Text**: none, title-only, title-subtitle, text-rich
+   - **Mood**: subtle, balanced, bold
+   - **Font**: clean, handwritten, serif, display
+3. **Cover Dimensions**: Must use **2.35:1 aspect ratio** (or `--aspect 2.35:1`) for WeChat top-banner cover images, or **1:1** for secondary covers.
+4. **Write Prompt**: Consult `references/cover/base-prompt.md` and save the structured image generation prompt to `{article_dir}/prompts/cover.md` before invoking the generator.
+5. **Generate & Auto-Compress**: Call the image generator. If the output image file size exceeds `max_cover_size_mb` (default 2.0MB), compress it using the compressor script:
    ```bash
    ${BUN} {baseDir}/scripts/compress-image.ts {article_dir}/cover.png -f png -q 80
    ```
@@ -173,6 +209,13 @@ For quick posts consisting of plain text and multiple images (up to 9):
 ```bash
 ${BUN} {baseDir}/scripts/wechat-browser.ts --markdown <markdown_file> --images <images_dir> [--submit]
 ```
+
+---
+
+### 📝 Automated Logging for Data Feedback Loop
+
+After ANY successful API publish or draft creation, the agent **MUST** write the structured publish results (including PostId, media_id, web links, status, and any error messages) to a local JSON log file in a designated directory (e.g., `publish-logs/YYYY-MM-DD-post.json` or as defined by the project). 
+This guarantees a closed-loop data pipeline where a Data Assistant agent can later fetch 24h/7d analytics to optimize the 60/30/10 ratio and publish times.
 
 ---
 

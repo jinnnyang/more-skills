@@ -1,32 +1,33 @@
-# Neon Palette
+# neon
 
-Vibrant neon colors on dark background. High-energy, futuristic, eye-catching.
+Vibrant neon colors on dark backgrounds
 
 ## Background
 
-- Color: Dark Purple (#1A1025)
-- Texture: Smooth, deep
+- Color: Deep Purple (#2D1B4E)
+- Texture: Subtle grid pattern or solid dark
 
 ## Colors
 
 | Role | Color | Hex | Usage |
 |------|-------|-----|-------|
-| Background | Dark Purple | #1A1025 | Primary background |
-| Text | Bright White | #F0F0F0 | Titles, main content |
-| Secondary Text | Light Lavender | #B8B8D4 | Annotations, labels |
-| Block Color | Neon Cyan | #00F5FF | Content block fill |
-| Block Color | Neon Magenta | #FF00FF | Content block fill |
-| Block Color | Neon Green | #39FF14 | Content block fill |
-| Block Color | Neon Pink | #FF6EC7 | Content block fill |
-| Accent | Electric Yellow | #FFFF00 | Emphasis, highlights |
+| Background | Deep Purple | #2D1B4E | Primary background |
+| Alt Background | Dark Teal | #0F4C5C | Alternative sections |
+| Primary | Hot Pink | #FF1493 | Main accent |
+| Secondary | Electric Cyan | #00FFFF | Supporting elements |
+| Tertiary | Neon Yellow | #FFFF00 | Highlights |
+| Accent 1 | Lime Green | #32CD32 | Energy, success |
+| Accent 2 | Orange | #FF6B35 | Warmth |
+| Text | White | #FFFFFF | Text elements |
+
+## Accent
+
+Hot Pink (#FF1493) for primary emphasis. High contrast neon-on-dark creates immediate visual impact.
 
 ## Semantic Constraint
 
-Vibrant neon color palette on dark background. Colors should glow against the dark base. High contrast, futuristic feel. Use neon sparingly — too many glowing elements become chaotic. Let dark background breathe. Do NOT render color names, hex codes, or role labels as visible text in the image.
+Vibrant neon-on-dark palette. High contrast, immediate visual impact. Do NOT render color names, hex codes, or role labels as visible text in the image.
 
-## Best Paired With
+## Best For
 
-- `bold` — amplifies high-impact energy
-- `pop` — neon takes the vibrancy further
-- `minimal` — neon accents on dark create striking contrast
-- `notion` — futuristic knowledge card aesthetic
+Gaming, retro tech, 80s/90s nostalgic content, bold editorial, trend and pop culture

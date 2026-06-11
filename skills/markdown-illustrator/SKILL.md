@@ -1,245 +1,122 @@
 ---
 name: markdown-illustrator
-description: >
-  Use this skill to analyze and illustrate Markdown articles ("为文章配图", "文章插图排版"). It automatically cleans accessibility attributes of stock images, establishes consistent visual brand boards, and generates/embeds high-quality diagrams, flowcharts, illustrations, or fact-based citation screenshots. It supports stock image alt/title enrichment via Agent vision, dark-themed SVG vector diagrams, Agent Native image generation, OpenAI-compatible APIs, and fact-based web screenshot references. When local image resources are referenced, it automatically performs relational copying to target directories, ensuring self-contained articles.
+description: Markdown文章自动配图与装配管线。当用户希望为文章配图、美化排版、添加卡片或逻辑图表时，必须触发此技能。即使没有显式提及“配图”，只要用户给出文章并希望优化其视觉呈现、提升排版质量、添加插画或思维导图，就应启动此技能。
+argument-hint: [待配图文章的绝对路径]
 ---
 
-# Markdown Illustrator
+# 🎨 Markdown 文章自动配图与装配管线 (Markdown Illustrator Pipeline)
 
-A unified document illustration, accessibility enrichment, and diagramming tool.
+本技能定义了为 Markdown 文章进行全自动、高审美、结构化配图与智能装配的 **6 步闭环管线 (6-Step Pipeline)**。
 
-## 🚀 Execution Workflow
+当用户提供了一篇 Markdown 文章（或指明其路径），并希望“为文章配图”、“优化视觉表现”、“进行精美排版”时，你必须严格按照本规范组织和调用 `guides/` 目录下的各个步骤指南。
 
-### Step 0: Pre-flight Check (Collaborative Condition Checking)
-Before generating any image or writing code, the agent MUST perform environment discovery:
-1. **Cognitive Pause**: Output a brief plain-text plan detailing what needs verification before executing commands (e.g. checking OS/shell, python location, API keys, and conversion tools).
-2. **Platform Probing**: Run native checks (`ver` or `$PSVersionTable` on Windows, `uname` on Linux/macOS) to identify OS and Shell.
-3. **Python Check**: Ensure the Python command does not resolve to the Windows Store stub (which causes silent failures or opens the App Store). Identify and use the path of a real system or Conda Python interpreter if the stub is detected in PATH.
-4. **Tool and Skill Listing**: Explicitly **list and inspect all drawing, illustration, or graphic generation tools and skills** registered in the active environment (e.g. tools like `generate_image`, `create_artwork` or skills like `pretty-mermaid`), and verify their schemas. Also verify if `.env` contains `DOCUMENT_ILLUSTRATOR_API_KEY` to check if the OpenAI-Compatible engine is configured.
-5. **SVG Converter Probe**: Check if `npx`, `rsvg-convert`, or `inkscape` are in PATH to confirm if SVG-to-PNG rendering is supported.
+---
 
-### Workflow Phases
-```
-[Input Document]
-       │
-       ▼
-[Step 1: Stock Image Enrichment] ──► Scan existing images, view contents via Agent Vision, and enrich empty alt/title tags
-       │
-       ▼
-[Step 2: Visual Strategy & POIs] ──► Establish Brand Board (style, colors) & identify Point of Interest (POI) anchors
-       │
-       ▼
-[Step 3: Harvesting & Engine Sel] ─► Harvest candidates from existing MD files or select engine (SVG/Native/OpenAI/Fact-based)
-       │
-       ▼
-[Step 4: Asset Plan] ──────────────► Plan layout, sources, prompts, filenames, sizes, and relational copier actions
-       │
-       ▼
-[Step 5: Execute & Copier] ────────► Generate or copy assets:
-       │                             - SVG: Write code -> convert via scripts/svg_to_png.py
-       │                             - Agent Native: Call discovered native tool
-       │                             - OpenAI-Compatible: Run scripts/openai_client.py
-       │                             - Fact-based Citation: Search/screenshot and apply Relational Copy to target
-       │
-       ▼
-[Step 6: Document Embedding] ──────► Insert Markdown with alt/title & append MITTS (with Source Attribution)
+## 🛠️ 全流程管线概览 (Pipeline Overview)
+
+```mermaid
+flowchart TD
+    classDef default fill:#FAFAF8,stroke:#1A2530,stroke-width:1px,color:#1A2530;
+    classDef step fill:#FAFAF8,stroke:#C62828,stroke-width:2px,color:#C62828,font-weight:bold;
+    
+    Start["输入: 原始文章 (.md)"] --> S1["步骤 1: 质量评估<br/>(1. image-text-evaluation-guide.md)"]:::step
+    S1 --> S2["步骤 2: 规划视觉图纸<br/>(2. illustration-spec-writing-guide.md)"]:::step
+    S2 --> S3["步骤 3: 轻量路由分发<br/>(3. illustration-routing-guide.md)"]:::step
+    
+    S3 --> S4["步骤 4: 隔离执行生成与检索<br/>(4a / 4b / 4c / 4d 子 Guide)"]:::step
+    S4 --> S5["步骤 5: 自动装配与格式校验<br/>(5. image-assembly-validation-guide.md)"]:::step
+    S5 --> S6["步骤 6: 最终质量重评<br/>(1. image-text-evaluation-guide.md)"]:::step
+    
+    S6 --> End["输出: 视觉升级后的文章 (.md)"]
+    
+    linkStyle default stroke:#1A2530,stroke-width:1px;
+    linkStyle 0,1,2,3,4,5,6 stroke:#C62828,stroke-width:1.5px;
 ```
 
 ---
 
-## 🎨 Four Drawing Engines & Sourcing
+## 📖 6-Step 详细执行指南
 
-### 1. SVG Vector Diagram Engine (Default for Tech/Flows)
-- **Best For**: Systems architecture, flowcharts, timelines, mind maps, structural tables.
-- **Workflow**:
-  1. Write a clean, self-contained dark-themed SVG following the **Design System** below.
-  2. Save it to `{output_dir}/[slug].svg`.
-  3. Run the conversion script to render a high-quality `@2x PNG`:
-     ```bash
-     python scripts/svg_to_png.py <output_dir>/[slug].svg <output_dir>/[slug].png [width]
-     ```
-     *(If conversion fails due to missing dependencies, keep the `.svg` and advise the user; browsers can render SVGs natively).*
+### 步骤 0：环境依赖前置自检 (Dependency Check)
+*   **动作**：在正式运行管线之前，检查技能根目录下是否已安装 NPM 依赖。若没有，请在后台运行 `npm install` 安装 `resvg-js`, `jsdom`, `dompurify` 等必要库，确保后续脚本能够正常执行。
 
-#### SVG Design System
-- **Background**: Deep Slate `#0f172a` with a subtle grid.
-  ```svg
-  <defs>
-    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
-    </pattern>
-  </defs>
-  <rect width="100%" height="100%" fill="#0f172a"/>
-  <rect width="100%" height="100%" fill="url(#grid)"/>
-  ```
-- **Semantic Colors**:
-  - **Primary/Cyan**: `rgba(8, 51, 68, 0.4)` / `#22d3ee` (User-facing, frontend, inputs)
-  - **Secondary/Emerald**: `rgba(6, 78, 59, 0.4)` / `#34d399` (Services, backend logic, APIs)
-  - **Tertiary/Violet**: `rgba(76, 29, 149, 0.4)` / `#a78bfa` (Database, storage, persistence)
-  - **Accent/Amber**: `rgba(120, 53, 15, 0.3)` / `#fbbf24` (Cloud infrastructure, regions)
-  - **Alert/Rose**: `rgba(136, 19, 55, 0.4)` / `#fb7185` (Errors, security, boundaries)
-- **Typography**: JetBrains Mono or SF Mono with monospaced fallback:
-  - Title: 16px, bold
-  - Components: 11-12px, semi-bold
-  - Descriptions/Sublabels: 9px, regular, color `#94a3b8`
+### 步骤 1：质量评估与现状诊断 (Diagnosis)
+*   **指令**：加载并执行 [1. image-text-evaluation-guide.md](guides/1.%20image-text-evaluation-guide.md)。
+*   **动作**：分析输入的 Markdown 文章，按照“图文匹配度”、“配图密度”、“图表类型多样性”等维度给出 1~5 分的现状打分。
+*   **退场条件**：如果打分为 5 分（已经非常完美，图表及排版无懈可击），直接向用户报告评估结果并结束管线，避免过度设计。如果低于 5 分，进入下一步。
 
----
+### 步骤 2：规划视觉图纸 (Planning Spec)
+*   **指令**：加载并执行 [2. illustration-spec-writing-guide.md](guides/2.%20illustration-spec-writing-guide.md)。
+*   **动作**：
+    1.  进行三维解耦推导（发布平台、内容领域、号设身份），拟定视觉流派与三色盘。
+    2.  **暂停并与用户交互确认**（询问流派、色盘推荐和保存位置）。
+    3.  确认后，读取对应的 palettes 和 styles 规范，定位文章的配图插槽 `📌 [位置 N]`。
+    4.  生成并保存文章专属的规划清单：`[原文章名].plan.md`。
 
-### 2. Agent Native Engine
-- **Best For**: Quick, general concept illustrations, cover images, mockups, or when no custom API keys are available.
-- **Workflow**:
-  1. **Discover Tool**: Dynamically inspect the list of registered tools in the current environment to identify the platform's native image generator (e.g. `generate_image`, `create_artwork`, or platform-specific equivalent). Review its arguments and schema details. Do not assume or hardcode a specific schema.
-  2. Draft a descriptive prompt containing style modifiers (e.g. `gradient-glass`, `vector-illustration`, `notion`).
-  3. Call the discovered native tool using its exact defined schema structure.
-  4. Copy/move the generated image from the tool's output directory to the document's `{article_dir}/assets/` directory.
+### 步骤 3：轻量路由分发 (Routing)
+*   **指令**：加载并执行 [3. illustration-routing-guide.md](guides/3.%20illustration-routing-guide.md)。
+*   **动作**：遍历 `[原文章名].plan.md` 中的每个配图插槽，识别其“配图类型”，决定其分发路径（路径 1 ~ 4），并准备依次加载对应的子 Guide 运行。
 
----
+### 步骤 4：隔离执行生成与检索 (Generation / Retrieval)
+*   **动作**：对于每一个分流节点，加载对应的专属指南，在相互隔离的上下文中生成或检索图片：
+    *   **路径 1 (结构化图表)**：加载 [4b. mermaid-diagram-writing-guide.md](guides/4b.%20mermaid-diagram-writing-guide.md)，产出 `.mmd`。
+    *   **路径 2 (矢量知识卡片)**：加载 [4c. svg-card-writing-guide.md](guides/4c.%20svg-card-writing-guide.md)，产出 `.svg`。
+    *   **路径 3 (生成式插画)**：加载 [4a. ai-image-generation-guide.md](guides/4a.%20ai-image-generation-guide.md)，使用 Moonvy 提示词公式并调用绘图工具，产出 `.png`。
+    *   **路径 4 (真实媒体检索)**：加载 [4d. media-search-retrieval-guide.md](guides/4d.%20media-search-retrieval-guide.md)。该步骤会执行本地资产收割脚本：
+        ```bash
+        npx tsx scripts/harvest-assets.ts <工作区目录> <目标文章绝对路径> <关键词> <原文章名>.cand.md
+        ```
+        并同时执行网络检索，经过多模态视觉质检和证据级别对比，决定最终选用。
+*   **输出数据契约**：所有子 Guide 运行结束后，必须将最终结果以统一的单行标准格式追加写入到 `[原文章名].cand.md` 注册清单中：
+    ```markdown
+    <建议插入行号>: ![<Alt描述>](images/[三段式文件名].[ext] "<Title标题>")
+    ```
 
-### 3. OpenAI-Compatible Engine (Requires Configuration)
-- **Best For**: Photorealistic, stylized, high-fidelity illustrations, reference-based variation (ref-to-image), or image-mask edits.
-- **Environment Check**:
-  Reads the following environment variables (from `.env` or system variables):
-  - `DOCUMENT_ILLUSTRATOR_BASE_URL` (default: `https://api.openai.com/v1`)
-  - `DOCUMENT_ILLUSTRATOR_API_KEY` (required)
-  - `DOCUMENT_ILLUSTRATOR_MODEL_NAME` (default: `dall-e-3`)
-- **Workflow**:
-  Run the bundled helper script to communicate with the OpenAI-compatible endpoint:
-  
-  **Generate (Text-to-Image)**:
-  ```bash
-  python scripts/openai_client.py --mode generate --prompt "Your detailed visual prompt" --output <output_dir>/[slug].png --size 1024x1024
-  ```
+### 步骤 5：自动装配与格式校验 (Assembly & Validation)
+*   **指令**：加载并执行 [5. image-assembly-validation-guide.md](guides/5.%20image-assembly-validation-guide.md)。
+*   **动作**：
+    1.  读取 `[原文章名].cand.md`，执行 **自底向上装配算法**，把配图代码批量插入到主文档对应行号下，避免行号漂移。
+    2.  执行格式校验：扫描正文的 `.mmd` 引用，调用 `mermaid-cli`（`mmdc`）一键编译为 `.png`，并同步更新正文后缀。
+    3.  执行物理文件存在性与双轨制 Alt 合规性校验，输出校验报告。
 
-  **Variation (Image-to-Image / Style Anchor)**:
-  ```bash
-  python scripts/openai_client.py --mode variation --image <path_to_anchor.png> --output <output_dir>/[slug].png --size 1024x1024
-  ```
-
-  **Edit (Inpainting / Masking)**:
-  ```bash
-  python scripts/openai_client.py --mode edit --prompt "Add a futuristic server rack in the empty area" --image <base.png> --mask <mask.png> --output <output_dir>/[slug].png
-  ```
+### 步骤 6：最终质量重评 (Re-evaluation)
+*   **指令**：重新加载并执行 [1. image-text-evaluation-guide.md](guides/1.%20image-text-evaluation-guide.md)。
+*   **动作**：对装配完图片的文章进行二次打分，并将配图前后的分数与维度评估进行对比，在会话中向用户呈递最终升级报告。
 
 ---
 
-### 4. Fact-based Web Citation & Screenshot Engine
-- **Best For**: Factual proofs, news screen captures, official notices, live user interfaces, or verified graphics that back up a claim.
-- **Workflow**:
-  1. Detect key arguments or claims in the text that benefit from real-world proof (e.g., "据央视新闻报道", "Apple 官方声明中指出").
-  2. Perform a web search or browse to fetch the actual screenshot, diagram, or official image.
-  3. Save the image to `{output_dir}/[slug].png`.
-  4. Ensure a clear Source Attribution (e.g. `[图片来源：央视新闻]`) is included in the alt, title, and MITTS block.
+## 📂 目录结构与资源关系
 
----
+请确保你在调用脚本或查找文件时，遵循以下固定的目录布局关系：
 
-## 🌾 Asset Harvesting & Relational Copier (素材收割与关联复制)
-
-When illustrating articles, the agent MUST inspect the local workspace to reuse existing assets or perform copying to keep the output self-contained:
-1. **Existing Asset Harvesting**:
-   - Before generating new assets, scan nearby Markdown files (particularly under `skills/pretty-markdown/waiting/` or configured folders) that are semantically related to the article topic.
-   - Use regular expressions to extract existing references: `!\[(?P<alt>.*?)\]\((?P<url>.*?)(?:\s+"(?P<title>.*?)")?\)`
-   - If an existing image (remote or local) matches the needed POI concept, consider it as a candidate.
-2. **Relational Copying**:
-   - If you select an image located in a local directory (e.g., `../waiting/some_folder/image.png`), you MUST perform a physical file copy of that image to the destination's `{article_dir}/assets/` folder.
-   - Update the Markdown link in the target document to use the relative path pointing to the copied file: `![Alt](assets/image.png "Title")`.
-3. **Alt & Title Quality Rules**:
-   - Never write empty alt or title attributes.
-   - Format: `![Detailed description of the image content](assets/path.png "Brief title/source")`.
-
----
-
-## 🖼️ Stock Image Accessibility Enrichment (存量图片无障碍化富化)
-
-Before performing new illustrations, the agent MUST scan the input Markdown document for existing image nodes and enrich their metadata using its own vision capabilities:
-1. **Target Identification**:
-   - Find all `![alt](url "title")` image tags.
-   - If the `alt` attribute is empty, placeholder-like, or shorter than 5 characters, or if the `title` attribute is missing, mark it for enrichment.
-2. **Vision Analysis**:
-   - For local images (e.g. `assets/image.png`), use the `view_file` tool to open and view the image.
-   - For remote images, use web/browser tools to retrieve a visual description.
-   - Use surrounding paragraph text to understand the context.
-3. **Tag Enrichment**:
-   - Write a descriptive, accurate, and concise `alt` text in the target language of the article.
-   - Write a clear, short `title` text.
-   - Do NOT run any external scripts or call extra models; perform the description generation directly using the agent's native vision capability.
-   - Replace the tag in the Markdown file in-place: `![Detailed alt description](url "Concise Title")`.
-
----
-
-## 📐 Step 6: Document Embedding & MITTS Specifications
-
-When embedding any generated illustration (SVG, Agent Native, or OpenAI-Compatible) into a document or article, the agent MUST adhere to the **Multi-dimensional Image Textual Transmission Standard (MITTS)**. This ensures downstream LLMs and assistive technologies can fully comprehend the visual structure, data points, and analytical conclusions without seeing the image pixels.
-
-### 1. Language Adaptation Rule (CRITICAL)
-- **Primary Rule**: The language of the MITTS block MUST dynamically adapt to the primary language of the target document or the user's input context (e.g., if the document is written in Chinese, use Chinese for MITTS; if written in English, use English for MITTS; or follow any explicit language descriptors).
-
-### 2. Embedding Structure
-Immediately below the standard Markdown image tag, insert a blockquote with the following four-dimensional structure:
-
-**For Chinese Output (自适应中文输出模式)**:
-```markdown
-![{图片描述}](assets/{图片别名}.png "{图片标题}")
-> 💡 **图表多维文本透传 (LLM & 读屏友好)**：
-> - **图表类型与核心主题**：[图表类型，如：系统架构流程图，展示从 Blogwatcher 采集到投资信号生成的全自动化流程]
-> - **核心组件与关键数据/流向**：[主要组件与关键流向，如：包含：1. Blogwatcher 定时新闻抓取；2. 网页清洗与去噪；3. 转换为 Markdown 日报；4. read-all 本地分析提取信号；5. 输出为 JSON 数据库与看板提示]
-> - **业务逻辑/核心趋势描述**：[业务逻辑描述，如：展示了非结构化数据向高价值结构化信号级联提纯的完整数据流向，表明各组件之间为解耦的本地化流式协作关系]
-> - **推导结论与商业/技术价值**：[判断性结论，如：数据印证了本地化自动化流水线能够完全去除人工噪音，将整体分析延迟从小时级缩短至分钟级，是内容运营效率提升的典型示范]
-> - **图片来源与事实依据**：[图片来源，如：央视新闻官方微博截图 / 自行截图 / 绘图引擎生成 / 引用自 waiting/ 目录下的 index.md 关联复制资源]
 ```
-
-**For English Output (Adaptive English Output Mode)**:
-```markdown
-![{Image Description}](assets/{image_name}.png "{Image Title}")
-> 💡 **Multi-dimensional Image Textual Transmission (LLM & Screen-Reader Friendly)**:
-> - **Chart Type & Core Theme**: [Chart type and theme, e.g., System architecture flowchart showing the end-to-end automation from Blogwatcher scanning to investment signal generation]
-> - **Core Components & Key Flows/Data**: [Major components and key flows, e.g., 1. Blogwatcher scan (ingestion) -> 2. Metadata parsing & noise filtering -> 3. Markdown daily report generation -> 4. read-all local parser execution -> 5. Investment Tracking Signals database update]
-> - **Business Logic / Core Trend Description**: [Business logic description, e.g., Demonstrates a high-efficiency pipeline purifying raw unstructured news feeds into structured actionable insights, highlighting decoupled local-first services]
-> - **Key Takeaways & Business/Technical Value**: [Conclusive takeaway, e.g., Proves that a local automated pipeline eliminates human selection noise and cuts analytical latency from hours to minutes, offering a premium pattern for local content operations]
-> - **Image Source & Factual Basis**: [Image source and attribution, e.g., CCTV News official microblog screenshot / Local application UI screenshot / AI generated / Referenced and copied from waiting/ directory]
+markdown-illustrator/
+├── SKILL.md (本文件，管线总控)
+├── guides/   (6 步步骤指南文件)
+│   ├── 1. image-text-evaluation-guide.md
+│   ├── 2. illustration-spec-writing-guide.md
+│   ├── 3. illustration-routing-guide.md
+│   ├── 4a. ai-image-generation-guide.md
+│   ├── 4b. mermaid-diagram-writing-guide.md
+│   ├── 4c. svg-card-writing-guide.md
+│   ├── 4d. media-search-retrieval-guide.md
+│   └── 5. image-assembly-validation-guide.md
+├── scripts/  (自动化执行脚本)
+│   └── harvest-assets.ts
+├── references/ (全局视觉与画布预设规范)
+│   ├── canvas/   - 社交平台安全区域与尺寸规格
+│   ├── palettes/ - 标准视觉色票模板
+│   └── styles/   - 艺术流派与美学设计要素
+└── learnings.md
 ```
 
 ---
 
-## 🛠️ Configuration & Storage Defaults
+## 🏁 下一步指引 (Pipeline Handoff)
 
-### Default Placement
-- **Standard Mode**: Always write generated graphics to `{article_dir}/assets/`.
-- **Snippet/Pasted Mode**: If the user pastes raw text in the chat directly, save illustrations to `./assets/` relative to the current working directory.
-- **Markdown Insert**: Relative path `assets/[slug].png` (or `.svg`).
+执行此技能时，建议优先通过命令行调用或自动化任务管理。一旦你接收到待配图文章，请立刻向用户反馈步骤 1 的现状诊断打分，并询问是否启动步骤 2 的视觉图纸规划。
 
----
-
-## 📝 Guide to Style Presets
-When generating bitmap images (via Agent Native or OpenAI-Compatible), recommend one of these three primary styles to ensure visual harmony:
-
-1. **Gradient Glass (`gradient-glass`)**: Modern tech-feel, transparent glass cards, soft neon glow, deep slate background. Best for dashboards and concept highlights.
-2. **Notion Style (`notion`)**: Minimalist hand-drawn line art, black/white line thickness, intellectual. Best for tutorials and definitions.
-3. **Vector Illustration (`vector-illustration`)**: Flat shapes, bold outlines, friendly pastel palette. Best for narratives and cover artwork.
-
----
-
-## 🔧 Troubleshooting and Guidance
-
-### API Key Missing
-If the user requests the OpenAI-Compatible engine but `DOCUMENT_ILLUSTRATOR_API_KEY` is not found:
-1. Alert the user that the key is missing.
-2. Guide them on setting it in their `.env` file:
-   ```env
-   DOCUMENT_ILLUSTRATOR_API_KEY=your_key_here
-   DOCUMENT_ILLUSTRATOR_BASE_URL=https://api.openai.com/v1
-   DOCUMENT_ILLUSTRATOR_MODEL_NAME=dall-e-3
-   ```
-3. Offer to fall back to the **Agent Native** or **SVG** engines in the meantime.
-
----
-
-## 🔗 Next Step: Image Compression & Publishing
-
-After generating and embedding the illustrations, suggest the natural next pipeline step to the user:
-
-```
-Illustration generation complete!
-Options:
-A) Compress Images — Optimize generated PNG/SVG file size using the WeChat Publishing compressor (Recommended)
-B) Publish to WeChat — Upload the illustrated article and cover directly to your WeChat Drafts
-C) No thanks — Keep the current uncompressed local images
-```
+当整个 `markdown-illustrator` 管线执行完毕并输出最终升级报告后，考虑向用户推荐以下后续技能或动作：
+*   **文章排版与语法优化**：如果文章用于公开发表，建议运行 `pretty-markdown`（如果可用）进行中英文排版优化。
+*   **格式导出**：如果用户需要在会议中演示，建议将 Markdown 转换为 PDF 或 PPTX。
+*   **人工校验**：提醒用户检查最终的 Markdown 文档，确认所有插图（特别是 Mermaid 图表与 SVG 卡片）渲染符合预期。

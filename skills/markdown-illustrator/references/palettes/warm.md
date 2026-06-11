@@ -1,32 +1,32 @@
-# Warm Palette
+# warm
 
-Warm earth tones on soft peach background. Cozy, inviting, no cool colors.
+Warm earth tones on soft peach, no cool colors
 
 ## Background
 
 - Color: Soft Peach (#FFECD2)
-- Texture: Warm, slightly textured
+- Texture: Warm paper texture
 
 ## Colors
 
 | Role | Color | Hex | Usage |
 |------|-------|-----|-------|
 | Background | Soft Peach | #FFECD2 | Primary background |
-| Text | Deep Brown | #744210 | Titles, main content |
-| Secondary Text | Warm Brown | #9C6644 | Annotations, labels |
-| Block Color | Warm Orange | #ED8936 | Content block fill |
-| Block Color | Terracotta | #C05621 | Content block fill |
-| Block Color | Golden Yellow | #F6AD55 | Content block fill |
-| Block Color | Dusty Rose | #D4A09A | Content block fill |
-| Accent | Burnt Sienna | #A0522D | Emphasis, highlights |
+| Outlines | Deep Charcoal | #2D2D2D | All element outlines |
+| Primary | Warm Orange | #ED8936 | Main accent color |
+| Secondary | Terracotta | #C05621 | Warm depth |
+| Tertiary | Golden Yellow | #F6AD55 | Highlights, energy |
+| Accent | Deep Brown | #744210 | Grounding, anchoring |
+| Text | Warm Charcoal | #4A4A4A | Text elements |
+
+## Accent
+
+Warm Orange (#ED8936) for primary emphasis. Warm-only palette — no cool colors (no green, blue, purple). Modern-retro feel.
 
 ## Semantic Constraint
 
-Warm-only color palette, no cool colors (no blue, green, purple). Earth tones throughout. Evokes comfort, warmth, and trust. All colors should feel like autumn sunlight. Do NOT render color names, hex codes, or role labels as visible text in the image.
+Warm earth tone palette. Warm-only — no cool colors (no green, blue, purple). Do NOT render color names, hex codes, or role labels as visible text in the image.
 
-## Best Paired With
+## Best For
 
-- `warm` — natural pairing, amplifies cozy feel
-- `cute` — warm pastels enhance the sweet aesthetic
-- `retro` — earth tones complement vintage style
-- `sketch-notes` — warm educational feel
+Product showcases, team introductions, feature grids, brand content, personal growth, lifestyle
