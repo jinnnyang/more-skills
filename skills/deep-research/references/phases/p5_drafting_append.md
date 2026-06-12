@@ -7,14 +7,14 @@ This phase guides the Lead Agent in compiling and drafting the long-form researc
 ## 1. Context Optimization & Preparation
 To prevent context bloat and downstream LLM output truncation (avoiding single-response `max_output_tokens` limits):
 - **Memory Optimization**: **DO NOT** keep previously written draft chapters in active context.
-- **Lazy Loading**: For each section, load only: the core report outline, the specific subagent findings notes (`findings/task-*.md`) linked to this chapter, and the washed Global Citation Registry from KANBAN.md.
+- **Lazy Loading**: For each section, load only: the core report outline (`chapters/outline.md`), the specific subagent findings notes (`findings/task-*.md`) linked to this chapter, and the washed Global Citation Registry (`citations_washed.md`).
 - **Goal**: Maintain a tight, high-focus context window for the LLM to write a single premium, dense chapter (400-800 words) at a time.
 
 ---
 
 ## 2. Drafting & Visual Embedding Rules
 
-For each pending section in `KANBAN.md`, execute the drafting block:
+For each pending section in `task.md`, execute the drafting block:
 1. **Contextual Anchoring**: Never insert an image or diagram out of nowhere. Precede every media asset with a clear narrative transition or hook (e.g., *"As shown in the system architecture workflow below, the process flow is..."*).
 2. **Specialized Illustration Integration (doc-illustrator)**:
    - If `doc-illustrator` is available, invoke it using its exact documented prompt-assembly and calling interface to generate the planned PNG (e.g., `assets/workflow_pipeline.png`).
@@ -43,28 +43,28 @@ For each pending section in `KANBAN.md`, execute the drafting block:
 
 ---
 
-## 3. Chunk-then-Merge & KANBAN Checkpoints
-1. **Isolated Drafting**: Do NOT append directly to `report.md`. Write each freshly generated chapter to its own file in a `drafts/` directory (e.g., `drafts/chapter_1.md`, `drafts/chapter_2.md`). Ensure the file names contain the chapter sequence number so they sort correctly.
-2. Update `kanban/KANBAN.md`: move the drafted section to `Completed Sections` and mark it as `[x]`.
-3. Print a single-line progress log: `[P5 drafting] section {index}/{total}: [SectionName] saved to drafts.`
+## 3. Chunk-then-Merge & Task Checkpoints
+1. **Isolated Drafting**: Write each freshly generated chapter to its own file in a `chapters/` directory (e.g., `chapters/01_intro.md`, `chapters/02_market.md`). Ensure the file names contain the chapter sequence number so they sort correctly.
+2. Update `task.md`: mark the drafted section as `[x]`.
+3. Print a single-line progress log: `[P5 drafting] section {index}/{total}: [SectionName] saved to chapters.`
 4. Do NOT perform Git commits on every single chapter. Keep commits restricted to the three main lifecycle nodes.
 
 ---
 
 ## 4. Checkpoint & Crash Resume Mechanism
 If the execution is cut off (e.g., due to API timeout, network failure, or token exhaustion) while writing Chapter 3:
-1. **Reload**: When the skill is re-activated, the Lead Agent reads `kanban/KANBAN.md`.
-2. **Diff**: List files in the `drafts/` directory and verify they match the `Completed Sections` in the Kanban.
-3. **Resume**: Clear historical chat context, load the first `Pending Section` from the Kanban checklist, and resume writing the missing standalone chapter files.
+1. **Reload**: When the skill is re-activated, the Lead Agent reads `task.md`.
+2. **Diff**: List files in the `chapters/` directory and verify they match the completed sections in the task list.
+3. **Resume**: Clear historical chat context, load the first `Pending Section` from the task list, and resume writing the missing standalone chapter files.
 
 ---
 
 ## 5. Report Compilation Completion & Git Commit
-Once all outline chapters and the `## 参考文献 / References` section are fully drafted in the `drafts/` directory:
-1. **Merge**: Execute `python scripts/merge_chapters.py` from the project root to automatically concatenate all draft chapters sequentially into the final `report.md`.
-2. Mark Phase 5 as completed in `kanban/KANBAN.md`.
+Once all outline chapters and the `## 参考文献 / References` section are fully drafted in the `chapters/` directory:
+1. **Merge**: Execute `python scripts/merge_chapters.py` from the project root to automatically concatenate all draft chapters sequentially into the final `report-<timestamp>.md`.
+2. Mark Phase 5 as completed in `task.md`.
 2. Execute the silent Git commit:
-   ```powershell
+   ```bash
    git add .
    git commit -m "stage: draft-report-written"
    ```

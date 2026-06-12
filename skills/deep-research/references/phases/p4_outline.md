@@ -18,24 +18,33 @@ Based on the visualization decision from Phase 3, plan the visual inserts and pr
 
 ---
 
-## 3. 看板登记与大纲格式 (Kanban Registry & Outline Format)
-Register the designed outline and visual plan as a checklist of `Pending Sections` in `kanban/KANBAN.md`.
+## 3. Outline Format & Task Registry (chapters/outline.md & task.md)
+Write the completed outline into `chapters/outline.md`. You MUST include an estimated word count for each chapter to prevent context overflow later.
+Then, register the drafting tasks as a checklist in the `## Phase 5: Drafting` section of `task.md`.
 
-### Kanban Outline Example (Chinese Adaptive):
+### `chapters/outline.md` Example (Chinese Adaptive):
 ```markdown
-## 4. 报告写作大纲与进度 (Report Outline & Progress)
+# Report Outline
 
-### 待撰写章节清单 (Pending Sections)
-- [ ] 章节 1：稀土全球供应链格局及中国垄断地位
-  - 引文来源：[1][2][5]
-  - 支撑证据：Task A-Finding 2, Task B-Finding 4
-  - 图表规划：生成 `./assets/supply_chain_share.png` (全球开采/冶炼份额占比饼图)
-  - SMIS规划：使用 Pattern A 模式，Alt文本内包含图表类型为占比饼图、中国冶炼占89%垄断数据、以及推导西方短期无法脱钩需保持合作的结论。
-- [ ] 章节 2：主要出口管制政策及对企业合规冲击
-  - 引文来源：[3][4]
-  - 支撑证据：Task C-Finding 1, 3
-  - 图表规划：内联 Mermaid 流程图 (展示双向申报与审批合规流程)
-  - SMIS规划：使用 Pattern B 模式，用 `<figure>` 标签包裹，并在 `<figcaption>` 内写入双向申报审批流程，包含从申请至终审的五大关卡，并得出合规审核周期将延长至60天以上的预判性结论。
+## 1. 稀土全球供应链格局及中国垄断地位 (~800 words)
+- 引文来源：[1][2][5]
+- 支撑证据：Task A-Finding 2, Task B-Finding 4
+- 图表规划：生成 `./assets/supply_chain_share.png` (全球开采/冶炼份额占比饼图)
+- SMIS规划：使用 Pattern A 模式，Alt文本内包含图表类型为占比饼图、中国冶炼占89%垄断数据、以及推导西方短期无法脱钩需保持合作的结论。
+
+## 2. 主要出口管制政策及对企业合规冲击 (~1200 words)
+- 引文来源：[3][4]
+- 支撑证据：Task C-Finding 1, 3
+- 图表规划：内联 Mermaid 流程图 (展示双向申报与审批合规流程)
+- SMIS规划：使用 Pattern B 模式，用 `<figure>` 标签包裹，并在 `<figcaption>` 内写入双向申报审批流程，包含从申请至终审的五大关卡，并得出合规审核周期将延长至60天以上的预判性结论。
+```
+
+### `task.md` Update Example:
+```markdown
+## Phase 5: Drafting
+- `[ ]` Draft Chapter 1 (稀土格局)
+- `[ ]` Draft Chapter 2 (合规冲击)
+- `[ ]` Run merge_chapters.py
 ```
 
 *Note: Phase 4 does not require triggering a silent Git commit.*

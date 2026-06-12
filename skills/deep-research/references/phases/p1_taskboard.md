@@ -23,27 +23,26 @@ For each subtask, register:
 
 ---
 
-## 2. KANBAN.md Integration
-Write the planned subtask list into the `## 3. Taskboard` section of `kanban/KANBAN.md`, and advance Phase 1 to completed.
+## 2. task.md Integration
+Write the planned subtask list into the `## Phase 2: Subagent Dispatch Tasks` section of `task.md`, and advance Phase 1 to completed by checking off the Pre-flight items.
 
-### Kanban Update Example (English Adaptive):
+### Task Update Example:
 ```markdown
-## 2. Phased Lifecycle Progress
-- [x] P0: Setup, Probing, & Interactive Intake (Completed)
-- [x] P1: Task Board Planning (Completed)
-- [ ] P2: Subagent Dispatch & Recursive Exploration (TODO)
-...
+## Pre-flight Checklist
+- `[x]` Run check_env.py
+- `[x]` Initialize workspace directories
+- `[x]` Create root artifacts
 
-## 3. Taskboard
-- [ ] **Task A**: Policy Compliance Analyst | Objective: Map out rare earth export licenses and quota constraints | Settings: Depth=3, Breadth=2 | Status: TODO | Output: findings/task-a.md
-- [ ] **Task B**: Comparative Analyst | Objective: First read `../project-a/report.md` to extract historical baselines, then compare current market data | Settings: Depth=2, Breadth=3 | Status: TODO | Output: findings/task-b.md
+## Phase 2: Subagent Dispatch Tasks
+- `[ ]` **Task A**: Policy Compliance Analyst | Objective: Map out rare earth export licenses and quota constraints | Settings: Depth=3, Breadth=2 | Output: findings/task-a.md
+- `[ ]` **Task B**: Comparative Analyst | Objective: First read `../project-a/report.md` to extract historical baselines, then compare current market data | Settings: Depth=2, Breadth=3 | Output: findings/task-b.md
 ```
 
 ---
 
 ## 3. First Lifecycle Git Commit 📌 [Silent Git Commit 1/3]
 If the Git CLI is active in the environment, run the first milestone commit silently to lock down the taskboard skeleton:
-```powershell
+```bash
 git add .
 git commit -m "stage: plan-initialized"
 ```

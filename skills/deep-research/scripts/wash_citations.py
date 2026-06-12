@@ -22,8 +22,8 @@ def main():
             with open(file_path, 'r', encoding='utf-8') as f:
                 in_sources = False
                 for line in f:
-                    line = line.strip()
-                    if line.startswith("## Sources"):
+                    clean_line = line.lower()
+                    if clean_line.startswith("## 1. sources") or clean_line.startswith("## sources"):
                         in_sources = True
                         continue
                     if line.startswith("## ") and in_sources:
@@ -38,14 +38,19 @@ def main():
                             if url_match:
                                 url = url_match.group(1)
                                 if url not in unique_urls:
-                                    unique_urls[url] = global_index
-                                    ordered_citations.append(f"[{global_index}] {content}")
+                                    idx = global_index
+                                    unique_urls[url] = idx
+                                    ordered_citations.append(f"[{idx}] {content}")
                                     global_index += 1
+                                else:
+                                    idx = unique_urls[url]
+                                    existing_content = ordered_citations[idx - 1]
+                                    if len(content) > len(existing_content) + 15 and content not in existing_content:
+                                        ordered_citations[idx - 1] = f"{existing_content} | (Alt desc: {content})"
         except Exception as e:
             print(f"Error parsing {file_path}: {e}")
     
-    os.makedirs("kanban", exist_ok=True)
-    out_path = os.path.join("kanban", "citations_washed.md")
+    out_path = "citations_washed.md"
     try:
         with open(out_path, 'w', encoding='utf-8') as out_f:
             out_f.write("### Global Validated Citations (Citations)\n")

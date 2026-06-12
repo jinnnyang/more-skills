@@ -15,45 +15,74 @@ The Lead Agent **MUST execute this workflow phase-by-phase**, and only load and 
 
 ## 📐 Phased Lifecycle & Routing Map
 
-```
-Lead Agent (Main Router Entry - Minimal Context Footprint)
-  │
-  ├── [Pre-flight] Cognitive Verification ──→ Load references/pre_flight_cognitive_checklist.md
-  │    └── Enforce "Skills over Primitives" evaluation before triggering P0.
-  │
-  ├── [P0] Setup, Probing, & Grill-Me Alignment ──→ Load references/phases/p0_setup.md
-  │    └── Scan environment, discover history, perform elite Grill-Me Q&A, initialize KANBAN/Git.
-  │
-  ├── [P1] Task Decomposition & Recursion Planning ──→ Load references/phases/p1_taskboard.md
-  │    └── Assign Depth and Breadth parameters, plan subtasks.
-  │    └── 📌 [Silent Git Commit 1/3]: stage: plan-initialized
-  │
-  ├── [P2] Subagent Adaptive Deep Dive ──→ Load references/phases/p2_dispatch.md
-  │    └── Recursively gather literature and findings, write to findings/task-*.md.
-  │
-  ├── [P3] Citation Washing & Semantic Media Audit ──→ Load references/phases/p3_wash_governance.md
-  │    └── De-duplicate citations, perform smart semantic media audit (SMIS Alt/HTML tags).
-  │
-  ├── [P4] Outline Mapping & Visual Planning ──→ Load references/phases/p4_outline.md
-  │    └── Set up pending sections in KANBAN.md, plan image/Mermaid placements and SMIS wrappers.
-  │
-  ├── [P5] Phased Section Drafting & Appending ──→ Load references/phases/p5_drafting_append.md
-  │    └── Draft section-by-section (400-800 words/chapter) and stream-append to report.md.
-  │    └── 📌 [Silent Git Commit 2/3]: stage: draft-report-written
-  │
-  ├── [P6] Counter-Review & Bias Auditing ──→ Load references/phases/p6_p7_review_verify.md
-  │    └── Perform adversarial self-review, challenge core claims, insert Key Controversies.
-  │
-  └── [P7] Verification, Archiving, & Packaging ──→ Load references/phases/p6_p7_review_verify.md
-       └── Verify citations/Mermaid, archive README, run final commit.
-       └── 📌 [Silent Git Commit 3/3]: stage: report-finalized
+```mermaid
+stateDiagram-v2
+    [*] --> PreFlight: 接收用户请求
+
+    state PreFlight {
+        [*] --> VerifyCognitive: 执行 Pre-flight 认知校验
+    }
+
+    PreFlight --> P0_Setup
+
+    state P0_Setup {
+        [*] --> InitWorkspace: 探测环境与历史
+        InitWorkspace --> CreateRoots: 初始化 root artifacts (task.md, plan.md, brief.md)
+        CreateRoots --> Git1: Git Commit 1/3 (plan-initialized)
+    }
+
+    P0_Setup --> P1_Taskboard
+
+    state P1_Taskboard {
+        [*] --> Decompose: 拆解子任务
+        Decompose --> Assign: 分配任务到 task.md
+    }
+
+    P1_Taskboard --> P2_Dispatch
+
+    state P2_Dispatch {
+        [*] --> Subagents: 调度 Subagents 执行深度搜索
+        Subagents --> Findings: 产出 findings/task-*.md
+    }
+
+    P2_Dispatch --> P3_Wash
+
+    state P3_Wash {
+        [*] --> WashCitations: 运行 wash_citations.py
+        WashCitations --> SMIS: 审计多媒体资源 (artifacts.md)
+    }
+
+    P3_Wash --> P4_Outline
+
+    state P4_Outline {
+        [*] --> DesignOutline: 规划 chapters/outline.md
+        DesignOutline --> MapEvidence: 映射证据与图表
+    }
+
+    P4_Outline --> P5_Drafting
+
+    state P5_Drafting {
+        [*] --> DraftChapters: 分片撰写 chapters/*.md
+        DraftChapters --> Merge: 运行 merge_chapters.py
+        Merge --> Git2: Git Commit 2/3 (draft-written)
+    }
+
+    P5_Drafting --> P6_P7_Review
+
+    state P6_P7_Review {
+        [*] --> CounterReview: 运行对抗性审查 (review.md)
+        CounterReview --> Verify: 校验引文与图表
+        Verify --> Git3: Git Commit 3/3 (report-finalized)
+    }
+
+    P6_P7_Review --> [*]
 ```
 
 ---
 
 ## 🔀 Output Language Adaptation (CRITICAL)
 
-- **Adaptive Core Rule**: While the internal prompts, checklists, and guides in this skill are written in standard **Silicon Valley English**, the language of the final generated outputs (including `KANBAN.md`, `findings/task-*.md`, the final `report.md` chapters, and all **media/HTML wrappers**) MUST dynamically adapt to the user's primary input language context.
+- **Adaptive Core Rule**: While the internal prompts, checklists, and guides in this skill are written in standard **Silicon Valley English**, the language of the final generated outputs (including `task.md`, `findings/task-*.md`, the final `report-<timestamp>.md`, and all **media/HTML wrappers**) MUST dynamically adapt to the user's primary input language context.
 - **Language Matching**:
   - If the user interacts primarily in **Chinese**, the generated research findings, reports, and image/media descriptions (SMIS) MUST be compiled in **Chinese**.
   - If the user interacts primarily in **English**, all outputs MUST be compiled in **English**.
@@ -68,7 +97,7 @@ Lead Agent (Main Router Entry - Minimal Context Footprint)
 3. **Environment & History Probing**: In P0, discover active drawing/illustration skills (like `doc-illustrator`), fact-checkers, and historic projects in `$HOME/projects/`. Use Grill-Me interaction to align on audience, depth, and cross-domain references.
 4. **Adaptive Deep Digging**: In P2, restrict subagents with Breadth and Depth parameters, allowing them to recursively follow citations and pool knowledge.
 5. **SMIS (Semantic Media Integration Standard)**: All visual and media assets (crawled web images, generated PNGs, or videos) MUST carry a rich, context-inferred description directly inside standard Markdown Alt-text (`![alt](url "title")`), or wrapped inside standard semantic HTML elements (like `<figure>`, `<figcaption>`, `<details>`, `<summary>`) to ensure full visual-less accessibility, clean Markdown layouts, and native downstream LLM comprehension.
-6. **Stream-Appending with Resume Support**: In P5, compile and append chapters one by one to `report.md`. Track progress in `KANBAN.md`. If a crash occurs, resume seamlessly from the first pending chapter.
+6. **Stream-Appending with Resume Support**: In P5, compile chapters as individual files in `chapters/`, then merge into `report-<timestamp>.md`. Track progress in `task.md`. If a crash occurs, resume seamlessly from the first pending chapter.
 7. **Non-blocking Git Integration**: Silent Git commits are restricted to **three primary lifecycle commits** and run silently if the Git CLI is active. If Git is unavailable, log a warning and continue without throwing an error.
 
 ---
