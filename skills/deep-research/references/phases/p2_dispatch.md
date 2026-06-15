@@ -24,6 +24,7 @@ Instead of static task dispatch, the Lead Agent MUST execute the following dynam
   - Cross out completed hypotheses.
   - Cross out hypotheses that are now obsolete.
   - **Spawn new tasks**: If the findings reveal new critical blindspots (within the boundaries of `plan.md`), append them to `tasks.md`.
+- **Event-driven Reflection (Autonomous Checkpointing)**: When updating `tasks.md`, if the Agent crosses off a core Major Hypothesis or clears an entire category of backlog tasks, it MUST trigger a self-reflection step: *"Has the current cognitive map achieved a major breakthrough?"* If YES, autonomously execute a semantic `git commit` (e.g., `git commit -m "Resolved hypothesis on Nanxun rental yield"`).
 
 ---
 
@@ -43,7 +44,8 @@ To prevent "Session compressed" failures:
 
 ## 4. Source Governance & SMIS Gathering
 All recorded literature and media assets MUST adhere to [research_notes_format.md](../research_notes_format.md).
-* **Media Asset Registry**: Do NOT download binary image files. **ONLY record** their original Web URLs.
+* **Media Asset Registry**: Subagents MUST actively discover and collect important external image artifacts (e.g., charts, data graphs). **Do NOT download binary image files**. Instead, actively record their original Web URLs using standard markdown syntax, which will eventually be appended to `artifacts.md`.
+* **Scratch Directory**: The `scratch/` directory is exclusively for storing temporary coding scripts (e.g., python plotting scripts, data processing code). Do NOT use it to store images.
 * **Initial SMIS Drafting**: Subagents MUST pre-draft a highly detailed description encapsulated inside standard Markdown Alt-text (Pattern A) or HTML wrappers (Pattern B).
 
 ---
@@ -56,4 +58,4 @@ To prevent chaotic data dumps, every atomic file in `findings/` MUST conform to 
 ---
 
 ## 6. Loop Termination
-Phase 2 concludes ONLY when `tasks.md` is empty of viable, in-scope tasks. Do not execute a silent Git commit in this phase.
+Phase 2 concludes ONLY when `tasks.md` is empty of viable, in-scope tasks. Git commits in this phase are handled dynamically via Event-driven Reflection.

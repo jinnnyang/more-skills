@@ -278,15 +278,35 @@ async function run() {
       const resvg = new Resvg(svg, {
         background: themeOptions.bg || '#ffffff',
         fitTo: {
-          mode: 'width',
-          value: 1200 // High-res width
+          mode: 'zoom',
+          value: 4.0 // 4x scale for ultra high-res pixel density
         }
       });
       const pngData = resvg.render();
       const pngBuffer = pngData.asPng();
+      
+      const width = pngData.width;
+      const height = pngData.height;
+      const aspectRatio = width / height;
+
       await fs.writeFile(outputPath, pngBuffer);
       console.log(`Successfully exported PNG to: ${path.resolve(outputPath)}`);
       console.log(`\n[AGENT GUIDANCE] SUCCESS. Mermaid diagram compiled and exported to PNG: ${outputPath}.`);
+      
+      let hasWarning = false;
+      if (aspectRatio > 2.5 || aspectRatio < 0.4) {
+        console.warn(`\n\x1b[33m[AGENT GUIDANCE - WARNING] Extreme Aspect Ratio Detected\x1b[0m`);
+        console.warn(`The rendered image has an extreme aspect ratio (width/height = ${aspectRatio.toFixed(2)}). Width: ${width}px, Height: ${height}px.`);
+        console.warn(`This often makes text unreadable when scaled to fit a document.`);
+        console.warn(`RECOMMENDATION: Modify the Mermaid code to balance the layout. Try using nested subgraphs with different directions (e.g., 'direction RL' inside a 'flowchart TD' graph) or introducing line breaks in long node texts.`);
+        hasWarning = true;
+      }
+      
+      if (width < 1500 && height < 1500) {
+        console.warn(`\n\x1b[33m[AGENT GUIDANCE - WARNING] Low Resolution Detected\x1b[0m`);
+        console.warn(`The rendered image resolution is low (${width}x${height}). It may not be crisp enough for high-DPI displays.`);
+        hasWarning = true;
+      }
     }
   } catch (error: any) {
     console.error("Error exporting diagram:", error.message || error);

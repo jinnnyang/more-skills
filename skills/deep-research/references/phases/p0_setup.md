@@ -64,7 +64,7 @@ Once aligned, navigate to the target directory `$HOME/projects/[project-name]` a
 
 ### Pattern A: New Research Project
 1. Create the project directory and run `git init` inside it.
-2. Initialize subfolders: `assets/`, `findings/`, `chapters/`, `scratch/`.
+2. Initialize subfolders: `assets/`, `findings/`, `chapters/`, `scratch/` (Note: `scratch/` is strictly for temporary coding scripts, plotting code, or data processing, NOT for downloading image artifacts).
 3. Create root artifacts:
    - Copy `templates/task.md` to `task.md`
    - Copy `templates/plan.md` to `plan.md`
@@ -77,9 +77,10 @@ Once aligned, navigate to the target directory `$HOME/projects/[project-name]` a
 
 ### Pattern B: Continuation Research
 If writing a follow-up or expansion to an existing project:
-1. **Base Version Tagging**: Run `git tag -a v[X.0.0]-base -m "Prior to new round"` to lock down historical state.
-2. **Workspace Purging**: Delete/purge old Markdown files inside `findings/` to prevent cross-contamination. Old drafts in `chapters/` can be archived to an `archive/` folder.
-3. Update `plan.md` to reflect the new expansion scope.
+1. **CRITICAL Structural Rule**: NEVER create nested subdirectories like `followups/`. Continuation research MUST remain flat in the original project root. The newly compiled reports will naturally co-exist in the root directory via timestamp differentiation.
+2. **Base Version Tagging**: Run `git tag -a v[X.0.0]-base -m "Prior to new round"` to lock down historical state.
+3. **Workspace Purging**: Delete/purge old Markdown files inside `findings/` to prevent cross-contamination. Old drafts in `chapters/` can be archived to an `archive/` folder.
+4. Update `plan.md` to reflect the new expansion scope.
 
 ---
 

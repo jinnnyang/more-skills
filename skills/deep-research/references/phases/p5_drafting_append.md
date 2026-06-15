@@ -23,7 +23,7 @@ For each pending section in `task.md`, execute the drafting block:
    - The Lead Agent **MUST actively reference and embed** the multimedia evidence (images, charts, videos, or transcripts) registered in the root `artifacts.md` file.
    - For any relevant media block registered in `artifacts.md`, copy its SMIS-compliant block (either Pattern A or Pattern B) and insert it into the chapter file.
    - Precede each embedded media block with a clear narrative transition or hook that explicitly cites or refers to the visual evidence.
-   - **All relevant evidence listed in `artifacts.md` MUST be referenced and integrated in the report's body text (e.g. `report-<timestamp>.md` or chapter files) to provide clear factual backing.**
+   - **All relevant evidence listed in `artifacts.md` MUST be referenced and integrated in the report's body text (e.g. `[topic-slug]-report-<timestamp>.md` or chapter files) to provide clear factual backing.**
    - **Pattern A (Simple/Compact Visuals)**: Embed as a standard Markdown link with a highly descriptive, context-inferred Alt text containing data, metrics, and business takeaways:
      `![【类型：图表类型】[数据事实描述](结合课题的推断性结论)](图片 Web URL "自解释标题")`
    - **Pattern B (Complex/Video/Transcripts)**: Embed as standard semantic inline HTML wrappers:
@@ -68,7 +68,7 @@ To prevent the LLM's context window from swelling and causing token exhaustion (
 
 ## 5. Report Compilation Completion & Git Commit
 Once all outline chapters and the `## 参考文献 / References` section are fully drafted in the `chapters/` directory:
-1. **Merge**: Execute `python scripts/merge_chapters.py` from the project root to automatically concatenate all draft chapters sequentially into the final `report-<timestamp>.md`.
+1. **Merge**: Execute `python scripts/merge_chapters.py [topic-slug]` from the project root, where `[topic-slug]` is a concise 2-4 word summary of this specific iteration's focus (e.g., `wuxing-60w-selfuse`). If omitted, it defaults to the project name. This concatenates all chapters sequentially into `[topic-slug]-report-<timestamp>.md`.
 2. **Update brief.md**:
    - Open `brief.md` and change the **Status** to `Reviewing`.
    - Update **Last Updated** with the current date.

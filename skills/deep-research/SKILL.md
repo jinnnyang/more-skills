@@ -86,7 +86,7 @@ stateDiagram-v2
 
 ## 🔀 Output Language Adaptation (CRITICAL)
 
-- **Adaptive Core Rule**: While the internal prompts, checklists, and guides in this skill are written in standard **Silicon Valley English**, the language of the final generated outputs (including `task.md`, `findings/task-*.md`, the final `report-<timestamp>.md`, and all **media/HTML wrappers**) MUST dynamically adapt to the user's primary input language context.
+- **Adaptive Core Rule**: While the internal prompts, checklists, and guides in this skill are written in standard **Silicon Valley English**, the language of the final generated outputs (including `task.md`, `findings/task-*.md`, the final `[topic-slug]-report-<timestamp>.md`, and all **media/HTML wrappers**) MUST dynamically adapt to the user's primary input language context.
 - **Language Matching**:
   - If the user interacts primarily in **Chinese**, the generated research findings, reports, and image/media descriptions (SMIS) MUST be compiled in **Chinese**.
   - If the user interacts primarily in **English**, all outputs MUST be compiled in **English**.
@@ -100,9 +100,9 @@ stateDiagram-v2
 2. **Knowledge-Centric Zettelkasten (Context Optimization)**: For large research projects, agents MUST drop older context to avoid memory overflow. The workspace is a living lab notebook: `findings/` stores atomic, semantically-named knowledge cards (e.g., `findings/2026-05-huzhou-hsr.md`), NEVER generic `task-a.md` files.
 3. **Environment & History Probing**: In P0, discover active drawing/illustration skills (like `doc-illustrator`), fact-checkers, and historic projects in `$HOME/projects/`. Use Grill-Me interaction to align on audience, depth, and cross-domain references.
 4. **The Breathing Foraging Loop**: In P2, the Lead Agent acts as an Explorer. It dispatches short-lived subagents to forage. Upon their return, the Lead Agent MUST synthesize their atomic findings into the cognitive map (`walkthrough.md`) and dynamically prune/spawn new tasks in `tasks.md`.
-5. **SMIS (Semantic Media Integration Standard)**: All visual and media assets (crawled web images, generated PNGs, or videos) MUST carry a rich, context-inferred description directly inside standard Markdown Alt-text (`![alt](url "title")`), or wrapped inside standard semantic HTML elements (like `<figure>`, `<figcaption>`, `<details>`, `<summary>`) to ensure full visual-less accessibility, clean Markdown layouts, and native downstream LLM comprehension.
-6. **Stream-Appending with Resume Support**: In P5, compile chapters as individual files in `chapters/`, then merge into `report-<timestamp>.md`. Track progress in `task.md`. If a crash occurs, resume seamlessly from the first pending chapter.
-7. **Non-blocking Git Integration**: Silent Git commits are restricted to **three primary lifecycle commits** and run silently if the Git CLI is active. If Git is unavailable, log a warning and continue without throwing an error.
+5. **SMIS (Semantic Media Integration Standard)**: All visual and media assets (crawled web images, generated PNGs, or videos) MUST carry a rich, context-inferred description directly inside standard Markdown Alt-text (`![alt](url "title")`), or wrapped inside standard semantic HTML elements (like `<figure>`, `<figcaption>`, `<details>`, `<summary>`) to ensure full visual-less accessibility, clean Markdown layouts, and native downstream LLM comprehension. **Agents MUST actively collect internet charts/diagrams and append them to `artifacts.md` via their original URLs. The `scratch/` directory is exclusively for temporary coding/drawing scripts, not binary images.**
+6. **Stream-Appending with Resume Support**: In P5, compile chapters as individual files in `chapters/`, then merge into `[topic-slug]-report-<timestamp>.md`. Track progress in `task.md`. If a crash occurs, resume seamlessly from the first pending chapter.
+7. **Non-blocking Git Integration**: Git commits follow a hybrid model: three primary lifecycle commits PLUS dynamic, event-driven semantic commits during the P2 foraging loop. Run silently if the Git CLI is active; if unavailable, log a warning and continue.
 
 ---
 

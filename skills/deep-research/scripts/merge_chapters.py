@@ -1,4 +1,5 @@
 import os
+import sys
 import re
 import glob
 from datetime import datetime
@@ -14,7 +15,13 @@ def get_sort_key(filepath):
 def main():
     chapters_dir = "chapters"
     timestamp = datetime.now().strftime("%Y%m%d-%H%M")
-    output_file = f"report-{timestamp}.md"
+    
+    if len(sys.argv) > 1:
+        topic_slug = sys.argv[1]
+    else:
+        topic_slug = os.path.basename(os.path.abspath(os.getcwd()))
+        
+    output_file = f"{topic_slug}-report-{timestamp}.md"
     
     if not os.path.exists(chapters_dir):
         print(f"Directory '{chapters_dir}' not found. No chapters to merge.")
