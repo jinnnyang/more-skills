@@ -5,9 +5,9 @@ description: |
   This skill MUST be activated when the user requests "help me investigate", "deep research", "review report", "indepth analysis", "competitive study", "industry report", or any work requiring robust factual backing, counter-arguments, and multi-media illustrations.
 ---
 
-# Deep Research (Lead Agent Main Routing Instruction)
+# Deep Research (Knowledge-Centric Foraging Model)
 
-This skill utilizes a **modular phased instruction architecture**. To prevent context bloat and downstream LLM output truncation (avoiding `max_output_tokens` limits) when compiling long reports, core execution details are partitioned into specialized phase files.
+This skill utilizes a **modular phased instruction architecture** driven by a **Zettelkasten (Lab Notebook) philosophy**. To prevent context bloat and downstream LLM output truncation, the workflow completely rejects mechanical linear execution. Instead, it relies on a dynamic, recursive "Breathing Foraging Loop" where discoveries continually reshape the research map.
 
 The Lead Agent **MUST execute this workflow phase-by-phase**, and only load and strictly execute the corresponding sub-phase instructions when transitioning to that phase.
 
@@ -27,25 +27,29 @@ stateDiagram-v2
 
     state P0_Setup {
         [*] --> InitWorkspace: 探测环境与历史
-        InitWorkspace --> CreateRoots: 初始化 root artifacts (task.md, plan.md, brief.md)
+        InitWorkspace --> CreateRoots: 初始化 root artifacts (task.md, plan.md, brief.md, artifacts.md)
         CreateRoots --> Git1: Git Commit 1/3 (plan-initialized)
     }
 
-    P0_Setup --> P1_Taskboard
+    P0_Setup --> P1_CognitiveMap
 
-    state P1_Taskboard {
-        [*] --> Decompose: 拆解子任务
-        Decompose --> Assign: 分配任务到 task.md
+    state P1_CognitiveMap {
+        [*] --> MapUnknowns: 梳理未知领域与核心假设
+        MapUnknowns --> InitBacklog: 生成初始动态待办 (tasks.md)
     }
 
-    P1_Taskboard --> P2_Dispatch
+    P1_CognitiveMap --> P2_ForagingLoop
 
-    state P2_Dispatch {
-        [*] --> Subagents: 调度 Subagents 执行深度搜索
-        Subagents --> Findings: 产出 findings/task-*.md
+    state P2_ForagingLoop {
+        [*] --> Inhale: 提取最高优任务，派发探测子智能体
+        Inhale --> Capture: 子智能体提取原子洞见 (findings/[date]-[topic].md)
+        Capture --> Exhale: 主智能体回收洞见，更新全局认知地图 (walkthrough.md)
+        Exhale --> Refine: 裁剪过期任务，繁衍新探索分支 (tasks.md)
+        Refine --> [*]: 边界收敛/任务池清空
+        Refine --> Inhale: 循环探测
     }
 
-    P2_Dispatch --> P3_Wash
+    P2_ForagingLoop --> P3_Wash
 
     state P3_Wash {
         [*] --> WashCitations: 运行 wash_citations.py
@@ -93,9 +97,9 @@ stateDiagram-v2
 ## 🚀 Execution Core Principles
 
 1. **Lazy Loading**: Only read a phase's reference file when transitioning into it. Do NOT clutter the context by loading unrelated phase instructions in advance.
-2. **Workspace as Long-Term Memory (Context Optimization)**: For super-large research projects, agents (Lead and Subagents) MUST atomize tasks and drop older context to avoid memory overflow. All agents MUST share states via a flat directory structure (`memories/`, `findings/`, `clues/`, `hypotheses/`). Agents should periodically read these folders to sync state, and explicitly write any valuable discoveries or guesses into them as Markdown files.
+2. **Knowledge-Centric Zettelkasten (Context Optimization)**: For large research projects, agents MUST drop older context to avoid memory overflow. The workspace is a living lab notebook: `findings/` stores atomic, semantically-named knowledge cards (e.g., `findings/2026-05-huzhou-hsr.md`), NEVER generic `task-a.md` files.
 3. **Environment & History Probing**: In P0, discover active drawing/illustration skills (like `doc-illustrator`), fact-checkers, and historic projects in `$HOME/projects/`. Use Grill-Me interaction to align on audience, depth, and cross-domain references.
-4. **Adaptive Deep Digging**: In P2, restrict subagents with Breadth and Depth parameters, allowing them to recursively follow citations and pool knowledge.
+4. **The Breathing Foraging Loop**: In P2, the Lead Agent acts as an Explorer. It dispatches short-lived subagents to forage. Upon their return, the Lead Agent MUST synthesize their atomic findings into the cognitive map (`walkthrough.md`) and dynamically prune/spawn new tasks in `tasks.md`.
 5. **SMIS (Semantic Media Integration Standard)**: All visual and media assets (crawled web images, generated PNGs, or videos) MUST carry a rich, context-inferred description directly inside standard Markdown Alt-text (`![alt](url "title")`), or wrapped inside standard semantic HTML elements (like `<figure>`, `<figcaption>`, `<details>`, `<summary>`) to ensure full visual-less accessibility, clean Markdown layouts, and native downstream LLM comprehension.
 6. **Stream-Appending with Resume Support**: In P5, compile chapters as individual files in `chapters/`, then merge into `report-<timestamp>.md`. Track progress in `task.md`. If a crash occurs, resume seamlessly from the first pending chapter.
 7. **Non-blocking Git Integration**: Silent Git commits are restricted to **three primary lifecycle commits** and run silently if the Git CLI is active. If Git is unavailable, log a warning and continue without throwing an error.

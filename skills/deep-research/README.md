@@ -2,7 +2,7 @@
 
 `deep-research` is the core research and intelligence synthesis skill in the Antigravity Agent Framework. It is designed to generate high-quality research reports with strict format control, traceable evidence, source governance, and multi-pass synthesis.
 
-Following this optimization, the skill has been upgraded to an **engineered persistent research version**. It fully supports cross-session Markdown Kanban project board tracking, localized multimedia mapping, plotting skill discovery with Mermaid fallback, robust pre-flight environment checks, and Chinese-first modular execution guides.
+Following this optimization, the skill has been upgraded to an **engineered persistent research version**. It fully supports cross-session Markdown project board tracking, localized multimedia mapping, plotting skill discovery with Mermaid fallback, robust pre-flight environment checks, and Chinese-first modular execution guides.
 
 ---
 
@@ -32,7 +32,7 @@ The user makes selection choices or minor adjustments, allowing swift intake.
 
 ### 2. 3-Stage Git Auto-Commit Lifecycle
 To ensure data safety across long-running research cycles and keep a clean history, the skill performs automated commits at key stages:
-- **📌 [Git Auto-Commit 1/3]**: `stage: plan-initialized` (P1 completion: outlines and Kanban tasks designed)
+- **📌 [Git Auto-Commit 1/3]**: `stage: plan-initialized` (P1 completion: outlines and project tasks designed)
 - **📌 [Git Auto-Commit 2/3]**: `stage: draft-report-written` (P5 completion: all draft sections appended and completed)
 - **📌 [Git Auto-Commit 3/3]**: `stage: report-finalized` (P7 completion: final reviews complete, citations verified, and project archived)
 

@@ -50,7 +50,7 @@ def main():
         except Exception as e:
             print(f"Error parsing {file_path}: {e}")
     
-    out_path = "citations_washed.md"
+    out_path = "citations.md"
     try:
         with open(out_path, 'w', encoding='utf-8') as out_f:
             out_f.write("### Global Validated Citations (Citations)\n")

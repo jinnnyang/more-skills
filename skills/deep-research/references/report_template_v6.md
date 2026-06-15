@@ -30,7 +30,7 @@ This template defines the exact formatting and structural rules for the final Ma
 {Chapter body narrative. Must present objective, balanced arguments, using citation tags [1][2] for every claim. Propose counter-arguments and acknowledge gaps.}
 
 ### Visual & Data Integration Standards:
-- **Specialized Visuals (Priority 1)**: Inspect the KANBAN registry. If doc-illustrator has generated a local PNG, embed it immediately.
+- **Specialized Visuals (Priority 1)**: Inspect the `artifacts.md` registry. If doc-illustrator has generated a local PNG, embed it immediately.
 - **Mermaid Fallback (Priority 2)**: If fallback is chosen, embed a double-quote-protected Mermaid block.
 - **Semantic Media Integration (MANDATORY)**: Embed visual and video assets using standard Markdown Alt-text (Pattern A) or semantic HTML wrappers (Pattern B) in the target output language under the Semantic Media Integration Standard (SMIS). Avoid custom blockquotes.
 

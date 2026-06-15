@@ -72,7 +72,8 @@ Once aligned, navigate to the target directory `$HOME/projects/[project-name]` a
    - Copy `templates/review.md` to `review.md`
    - Copy `templates/walkthrough.md` to `walkthrough.md`
    - Copy `templates/artifacts.md` to `artifacts.md`
-4. Populate `plan.md` with the aligned Project Information.
+4. **Initialize brief.md**: Fill in `brief.md` with `Status: Setup`, the current date under `Last Updated`, and pre-populate the `Executive Summary` with a brief paragraph describing the initial research objective.
+5. Populate `plan.md` with the aligned Project Information.
 
 ### Pattern B: Continuation Research
 If writing a follow-up or expansion to an existing project:

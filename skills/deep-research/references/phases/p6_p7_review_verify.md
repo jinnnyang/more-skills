@@ -24,9 +24,15 @@ To avoid consensus bias, the Lead Agent (or a spawned `self` subagent) MUST cond
 
 ---
 
-## 3. Project Packaging & README Summaries
-1. **README Updates**: Synthesize the core findings, domain parameters, citation breakdown, and conclusion highlights. Save/overwrite this summary in Silicon Valley English to the root directory's `README.md` and `README_zh-CN.md`.
-2. **Kanban Status Update**: Mark all phases as completed, and transition the project status to `COMPLETED` in `kanban/KANBAN.md`.
+## 3. Project Packaging, Brief & README Summaries
+1. **README Updates**: Synthesize the core findings, domain parameters, citation breakdown, and conclusion highlights. Save/overwrite this summary in Silicon Valley English to the root directory's `README.md` and `README_zh-CN.md`. Note that `README.md` serves as a general introduction to the repository, project setup, and how to read the files.
+2. **Brief Updates (Current Results Summary)**:
+   - Open `brief.md` and update **Status** to `Completed`.
+   - Update **Last Updated** with the current date.
+   - Under **Executive Summary**, write a concise 1-2 paragraph static snapshot summarizing the *current results and final conclusions* of the research project. Ensure this remains distinct from `README.md` (which is about the project structure/goals).
+   - Under **Key Discoveries**, list the final verified key discoveries.
+   - Under **Current Roadblocks**, write "None (Resolved)" or list any outstanding research gaps for future work.
+3. **Task Status Update**: Mark all phases as completed in `task.md`.
 
 ---
 
