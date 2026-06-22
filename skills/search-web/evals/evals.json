@@ -1,0 +1,35 @@
+{
+  "skill_name": "search-web",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Search for the latest news about 'James Webb Space Telescope' using the search-web skill and get results in JSON format.",
+      "expected_output": "A JSON list containing search result objects with titles, urls, and alt descriptions.",
+      "expectations": [
+        "The command exits with code 0",
+        "The output is a valid JSON array",
+        "At least one result contains 'telescope' or 'webb' in the title or alt text"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Search for images of 'mountains' in markdown format using the search-web skill.",
+      "expected_output": "A list of markdown image tags matching mountains.",
+      "expectations": [
+        "The command exits with code 0",
+        "The output contains markdown image syntax: ![alt](url \"title\")",
+        "The output contains mountain-related descriptions"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Perform a reverse image search on the remote URL 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba' to find pages containing it, using format json.",
+      "expected_output": "Search results pointing to pages or articles related to the input image.",
+      "expectations": [
+        "The command exits with code 0",
+        "The output contains links or web page URLs",
+        "The rate limiter is active and spacing requests correctly"
+      ]
+    }
+  ]
+}
