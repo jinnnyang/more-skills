@@ -58,8 +58,8 @@ async function main() {
     input_type = cleanPositionals[1].toLowerCase();
   }
 
-  const validOutputs = ['pages', 'images', 'videos', 'papers', 'locations', 'terms'];
-  const validInputs = ['texts', 'images'];
+  const validOutputs = ['pages', 'images'];
+  const validInputs = ['texts'];
 
   if (!validOutputs.includes(output_type)) {
     console.error(`Error: Invalid output type "${output_type}". Supported: ${validOutputs.join(', ')}`);

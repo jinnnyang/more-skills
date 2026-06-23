@@ -23,12 +23,12 @@
     },
     {
       "id": 3,
-      "prompt": "Perform a reverse image search on the remote URL 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba' to find pages containing it, using format json.",
-      "expected_output": "Search results pointing to pages or articles related to the input image.",
+      "prompt": "Search for 'artificial intelligence' using the search-web skill, format json.",
+      "expected_output": "A JSON list containing search result objects.",
       "expectations": [
         "The command exits with code 0",
-        "The output contains links or web page URLs",
-        "The rate limiter is active and spacing requests correctly"
+        "The output is a valid JSON array",
+        "At least one result contains 'intelligence' or 'ai' in the title or alt text"
       ]
     }
   ]

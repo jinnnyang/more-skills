@@ -115,11 +115,24 @@ export class SimpleFakeBrowser {
     }
   }
 
-  /**
-   * Performs a HTTP GET request with cookie tracking and rate limiting
-   */
   public async get(url: string, customHeaders: Record<string, string> = {}): Promise<Response> {
     await checkRateLimit(this.rateLimitRPM);
+
+    // If cookies are empty and requesting a search-related page, pre-fetch from homepage to populate cookies
+    if (this.cookies.size === 0 && (url.includes('/search') || url.includes('/images') || url.includes('/videos'))) {
+      try {
+        const parsedUrl = new URL(url);
+        const homepage = `${parsedUrl.protocol}//${parsedUrl.hostname}/`;
+        const prefetchHeaders = { ...this.defaultHeaders, ...customHeaders };
+        const prefetchRes = await fetch(homepage, {
+          method: 'GET',
+          headers: prefetchHeaders
+        });
+        this.saveCookies(homepage, prefetchRes.headers);
+      } catch (err) {
+        // Ignore pre-fetch failures and proceed
+      }
+    }
 
     const cookieHeader = this.getCookieHeader(url);
     const headers = { ...this.defaultHeaders, ...customHeaders };
