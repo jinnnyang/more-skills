@@ -37,8 +37,14 @@ flowchart TD
 
 ## 📖 6-Step 详细执行指南
 
-### 步骤 0：环境依赖前置自检 (Dependency Check)
-*   **动作**：在正式运行管线之前，检查技能根目录下是否已安装 NPM 依赖。若没有，请在后台运行 `npm install` 安装 `resvg-js`, `jsdom`, `dompurify` 等必要库，确保后续脚本能够正常执行。
+### 步骤 0：环境依赖前置自检与浏览器能力探测 (Dependency & Capability Check)
+*   **依赖检查**：在正式运行管线之前，检查技能根目录下是否已安装 NPM 依赖。若没有，请在后台运行 `npm install` 安装 `resvg-js`, `jsdom`, `dompurify` 等必要库，确保后续脚本能够正常执行。
+*   **浏览器能力探测 (UseBrowser)**：
+    1.  Agent 必须通过检查自己的工具注册表，确认当前是否具备访问和浏览网页的工具。
+    2.  **判定条件**：
+        - 若拥有如 `read_browser_page`、`read_url_content`、`chrome_devtools/*` 或其它能发起 HTTP 请求并获取/渲染 HTML 网页内容的浏览器类工具，则判定为 `UseBrowser = true`。
+        - 若仅有 `search_web`（只能获得文字搜索结果）或没有任何网页抓取工具，则判定为 `UseBrowser = false`。
+    3.  **传导机制**：自检完成后，Agent 应在当前会话的上下文记忆中记录该能力值，并作为状态变量传导至后续步骤。
 
 ### 步骤 1：质量评估与现状诊断 (Diagnosis)
 *   **指令**：加载并执行 [1. image-text-evaluation-guide.md](guides/1.%20image-text-evaluation-guide.md)。
@@ -48,10 +54,10 @@ flowchart TD
 ### 步骤 2：规划视觉图纸 (Planning Spec)
 *   **指令**：加载并执行 [2. illustration-spec-writing-guide.md](guides/2.%20illustration-spec-writing-guide.md)。
 *   **动作**：
-    1.  进行三维解耦推导（发布平台、内容领域、号设身份），拟定视觉流派与三色盘。
+    1.  进行三维解耦推导（发布平台、内容领域、号设身份），拟定视觉流派与三色盘。同时读取步骤 0 探测到的 `UseBrowser` 状态。
     2.  **暂停并与用户交互确认**（询问流派、色盘推荐和保存位置）。
-    3.  确认后，读取对应的 palettes 和 styles 规范，定位文章的配图插槽 `📌 [位置 N]`。
-    4.  生成并保存文章专属的规划清单：`[原文章名].plan.md`。
+    3.  确认后，读取对应的 palettes 和 styles 规范，定位文章的配图插槽 `📌 [位置 N]`。在规划插图类型时，根据 `UseBrowser` 状态，对事实/新闻类配图进行自适应规划（若为 false 则退化为本地资产模糊匹配或手动注入）。
+    4.  生成并保存文章专属的规划清单：`[原文章名].plan.md`。确保在规划清单的「基础元数据」中写入 `* **环境浏览器能力 (UseBrowser)**：true/false` 状态。
 
 ### 步骤 3：轻量路由分发 (Routing)
 *   **指令**：加载并执行 [3. illustration-routing-guide.md](guides/3.%20illustration-routing-guide.md)。
