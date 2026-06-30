@@ -28,22 +28,19 @@
   OPENAI_MODEL_NAME=gpt-4o                 # 必须是支持多模态的模型
   ```
 
-### 2. 调用专门的标准化脚本
-使用 `writing-style` 提供的简化脚本，仅专注于补全图片信息和格式标准化：
 ### 2. 调用标准化脚本
 ```bash
-cd C:\Users\jinnn\Documents\more-skills\skills\writing-style\scripts && node cli.js <input-file.md> [output-file.md]
+node skills/writing-style/scripts/cli.js <input-file.md> [output-file.md]
 ```
 - 如果省略 `[output-file.md]`，将**原位覆盖**输入文件
 - 如果指定输出文件，原始文件将保留不变
 - 依赖会自动安装，如果不存在 `node_modules`
-- 如果指定输出文件，原始文件将保留不变
 
 ### 3. 执行后检查
 脚本执行完成后：
 - 检查退出码是否为 0
 - 如果有错误提示，按照提示解决（通常是 API 密钥缺失或网络问题）
-- 预处理完成后，进入下一阶段风格蒸馏（现在从 `2. style-distillation-guide.md` 开始）
+- 预处理完成后，进入下一阶段风格蒸馏（现在从 `2-style-distillation-guide.md` 开始）
 
 ---
 

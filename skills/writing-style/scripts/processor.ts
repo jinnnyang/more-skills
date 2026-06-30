@@ -1,7 +1,7 @@
 import { MarkdownParser, MarkdownRender } from 'md2ast';
-import type { AnyNode, Image, CodeBlock, Text } from 'md2ast/dist/ast';
+import type { AnyNode, Image, CodeBlock, Text, Heading, Yaml } from 'md2ast';
 import { analyzeImage, inferCodeLanguage, extractGlobalMetadata } from './llm.js';
-import type { Heading, Yaml } from 'md2ast/dist/ast';
+// @ts-expect-error - pangu has no declaration file
 import pangu from 'pangu';
 import fs from 'fs/promises';
 import { existsSync } from 'fs';
@@ -114,7 +114,7 @@ export async function processMarkdown(
       if (child.type === 'heading' && (child as Heading).depth === 1) {
         // Simple extraction of heading text
         const h1 = child as Heading;
-        const textNode = h1.children?.find(c => c.type === 'text') as Text;
+        const textNode = h1.children?.find((c: AnyNode) => c.type === 'text') as Text;
         if (textNode) codeTitle = textNode.value;
         break;
       }
@@ -155,7 +155,7 @@ export async function processMarkdown(
       return node.value;
     }
     if ('children' in node && Array.isArray(node.children)) {
-      return node.children.map(child => getAllTextRecursive(child)).join('');
+      return node.children.map((child: AnyNode) => getAllTextRecursive(child)).join('');
     }
     return '';
   }
@@ -240,7 +240,7 @@ export async function processMarkdown(
     
     // Replace all children with our new fixed list
     // This completely fixes the broken parsing that split the image across multiple nodes
-    node.children = newChildren;
+    (node as any).children = newChildren;
   }
   
   // Fix entire AST starting from root children

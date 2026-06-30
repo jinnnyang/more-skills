@@ -3,7 +3,7 @@
 本指南指导大模型如何从用户提供的**已经标准化预处理**的样例文本中，深层提炼文本的“隐变量”与“观测表象”，并生成标准化的风格配置文件。
 
 > [!NOTE]
-> 预处理已经在 `1. normalize-markdown-inputs.md` 中完成，本阶段开始时输入 Markdown 文件的所有图片已经有完整的 Alt/Title。
+> 预处理已经在 `1-normalize-markdown-inputs.md` 中完成，本阶段开始时输入 Markdown 文件的所有图片已经有完整的 Alt/Title。
 
 ---
 
@@ -77,8 +77,8 @@
 
 ### Phase 4: 自适应命名与输出
 - **动态命名规则**：根据所蒸馏的文本类别，动态确定一个简练的英文/拼音标识符（如 `tech-commentary`、`pr-weekly` 等）。
-- **文件实际落盘 (Mandatory Tool Execution)**：**必须**调用 `write_to_file` 工具将组装好的风格文件实际保存至本地磁盘的绝对路径下：
-  `/home/twait-halek/Documents/more-skills/skills/writing-style/styles/[style-name].md`
+- **文件实际落盘 (Mandatory Tool Execution)**：**必须**调用 `write_to_file` 工具将组装好的风格文件实际保存至项目目录的相对路径下：
+  `skills/writing-style/styles/[style-name].md`
   （切记：绝对不能只在对话中打印展示，必须确实调用工具将文件落盘写入对应的 `styles/` 目录下）。
 
 ---

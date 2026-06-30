@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as dotenv from 'dotenv';
+import { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 
 // Load .env from the root of the skill directory if it exists
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -56,11 +57,11 @@ async function readLocalImage(filePath: string): Promise<{ mime: string; base64:
 /**
  * Base request logic for OpenAI Chat Completions
  */
-async function makeChatRequest(messages: any[], systemPrompt: string, responseFormat: 'text' | 'json_object' = 'text'): Promise<string> {
+async function makeChatRequest(messages: ChatCompletionMessageParam[], systemPrompt: string, responseFormat: 'text' | 'json_object' = 'text'): Promise<string> {
   const body = {
     model: OPENAI_MODEL_NAME,
     messages: [
-      { role: 'system', content: systemPrompt },
+      { role: 'system', content: systemPrompt } as ChatCompletionMessageParam,
       ...messages
     ],
     response_format: { type: responseFormat }
@@ -101,7 +102,7 @@ export async function extractGlobalMetadata(markdownText: string, codeTitle?: st
   // Truncate to first 4000 characters to save tokens, usually enough for metadata
   const contentToAnalyze = markdownText.slice(0, 4000);
   
-  const messages = [
+  const messages: ChatCompletionMessageParam[] = [
     {
       role: 'user',
       content: `Here is the start of the document:\n\n${contentToAnalyze}\n\n${codeTitle ? `(Note: The document title is known to be: ${codeTitle})\n` : ''}`
@@ -150,7 +151,7 @@ CRITICAL RULES:
     `Here is the textual context around the image in the document:\n"""\n${contextText}\n"""\n\nAnalyze this image and provide a highly descriptive alt text (what the image contains physically, including any specific quantitative metrics or data points shown) and a concise title (a short name or caption). REMEMBER TO OUTPUT STRICTLY IN: ${globalLanguage}! Return the response strictly as a JSON object: {"alt": "...", "title": "..."}` :
     `Analyze this image and provide a highly descriptive alt text (what the image contains physically) and a concise title (a short name or caption). REMEMBER TO OUTPUT STRICTLY IN: ${globalLanguage}! Return the response strictly as a JSON object: {"alt": "...", "title": "..."}`;
 
-  const messages = [
+  const messages: ChatCompletionMessageParam[] = [
     {
       role: 'user',
       content: [
@@ -182,7 +183,7 @@ CRITICAL RULES:
  */
 export async function inferCodeLanguage(code: string): Promise<string> {
   const systemPrompt = "You are a code detection tool. Your only output should be the lowercase name of the programming language (e.g. 'python', 'javascript', 'typescript', 'bash', 'json', 'html', 'css', 'yaml'). If you cannot detect it confidently, output 'text'. Do not wrap in markdown quotes.";
-  const messages = [
+  const messages: ChatCompletionMessageParam[] = [
     {
       role: 'user',
       content: code

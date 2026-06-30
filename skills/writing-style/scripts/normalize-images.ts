@@ -10,11 +10,7 @@
 import fs from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
-import * as dotenv from 'dotenv';
-import { processMarkdown } from './processor';
-
-// Load environment variables from .env file
-dotenv.config();
+import { processMarkdown } from './processor.js';
 
 /**
  * Main entry point for the normalization script.
@@ -72,7 +68,7 @@ async function main() {
     console.error('\n[AGENT GUIDANCE]');
     console.error(`[ERROR] Normalization failed: ${message}`);
     console.error('1. Check that dependencies are installed: run npm install in this directory');
-    console.error('2. Check that pretty-markdown/scripts/.env has valid OPENAI_API_KEY');
+    console.error('2. Check that skills/writing-style/.env has valid OPENAI_API_KEY');
     console.error('3. Verify network connectivity to the LLM API endpoint');
     process.exit(1);
   }
