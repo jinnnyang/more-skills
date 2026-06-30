@@ -1,0 +1,6 @@
+# Environment file with API keys - NEVER commit this
+.env
+node_modules/
+*.log
+*.tmp
+.DS_Store

@@ -1,0 +1,24 @@
+{
+  "name": "@writing-style/normalize-images",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Standalone markdown normalization for writing-style skill: complete missing image alt/title, format text, infer code block languages",
+  "main": "cli.js",
+  "scripts": {
+    "install-deps": "npm install",
+    "start": "node cli.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "md2ast": "^0.0.1",
+    "openai": "^4.0.0",
+    "pangu": "^4.0.7",
+    "tsx": "^4.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "license": "MIT",
+  "author": ""
+}
