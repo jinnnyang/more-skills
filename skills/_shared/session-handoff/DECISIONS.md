@@ -93,4 +93,34 @@ Deferred to §13: `project` (implied by cwd), `branch` (needs v2 branch-prefix l
 
 ---
 
-*Next: implement `skills/hand-off/SKILL.md` and `skills/take-over/SKILL.md` against PROTOCOL v0.2.*
+## 2026-07-16 — Post-Review Design Decisions (v0.3)
+
+Following the comprehensive review of PROTOCOL v0.2, several critical reliability, architecture, and user experience issues were addressed and incorporated into the protocol.
+
+### ① Script-assisted Execution to Lower Cognitive Load
+**Decision:** Standardize on a script-based helper pattern. Realize complex YAML parsing, Reality Check logic, Smart Cleanup classification, and Conflict Handling calculation in a python script (`skills/_shared/session-handoff/scripts/reconcile.py`) instead of relying solely on pure AI reasoning in the skill text.
+**Rationale:** Operating at high context usage (>75%) significantly degrades LLM reasoning capabilities. Offloading deterministic logic to Python ensures reliability and keeps the AI cognitive load minimal.
+
+### ② Atomic Write Protection
+**Decision:** All writes to `.hermes/handoff/` and `docs/handoff/` must be atomic: write to a `.tmp` file and rename (POSIX `rename()`) to overwrite the target.
+**Rationale:** Prevents torn writes/corrupted files if the agent is interrupted or crashes midway through the hand-off process.
+
+### ③ Metadata-based Tool-Call History Logs
+**Decision:** Add a structured `<session-tools-log>` markdown block at the bottom of the active `walkthrough.md`. It must serialize the list of actual tool calls (tool name, timestamp, simplified inputs/outputs) of the current session.
+**Rationale:** The LLM tool-call history is in-memory and lost across sessions. Recording it in walkthrough metadata allows the next session's `take-over` flow to verify claims without relying on agent memory.
+
+### ④ Cold-Start (Bootstrap) and Empty State Handling
+**Decision:** If `.hermes/handoff/` does not exist during `take-over` or `hand-off`, it is automatically initialized. `take-over` will report: "No previous handoff history found. Initialized empty session." and populate default files from `_shared/session-handoff/templates/`.
+**Rationale:** Resolves the first-time-use (FTU) user experience gap.
+
+### ⑤ Pre-empt Plan-Mode Merge Check
+**Decision:** Move the `plan-mode` coexistence check *before* the final report to the user in `take-over`.
+**Rationale:** If `plan-mode` files are imported, the report must reflect the imported tasks; otherwise, the summary shown to the user becomes immediately stale.
+
+### ⑥ Unified Frontmatter Kind Enum & Context Append-Only
+**Decision:** Frontmatter `kind` is strictly restricted to the enum values: `context`, `task`, `walkthrough`, `open-questions`, `plan`, `review`. The field name `kind` is mapped cleanly (no sub-namespaces). `context.md` is strictly additive; corrections are appended at the bottom as dated correction entries.
+**Rationale:** Eliminates parser ambiguity and maintains a clean audit trail.
+
+---
+
+*Next: implement `skills/hand-off/SKILL.md` and `skills/take-over/SKILL.md` against PROTOCOL v0.3.*
