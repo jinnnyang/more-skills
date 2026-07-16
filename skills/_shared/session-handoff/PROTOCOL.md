@@ -1,6 +1,6 @@
 # Session Handoff Protocol
 
-> **Status:** Draft (v0.1) — decision points ①②③④ pending user sign-off.
+> **Status:** v0.2 (2026-07-16 rev-2) — ①②③④ resolved (§10); MVP simplifications applied (see `DECISIONS.md` rev-2).
 > **Authors:** 刘工 + Hermes Agent (2026-07-16)
 > **Location:** `skills/_shared/session-handoff/PROTOCOL.md` — single source of truth referenced by `skills/hand-off/` and `skills/take-over/`.
 > **Scope:** Joint design for a pair of skills — `hand-off` (session close) and `take-over` (session resume) — that give multi-agent / multi-session work a shared protocol for transferring project state.
@@ -55,7 +55,7 @@ Four **core** documents (always considered), two **optional** (only when produce
 | `context.md` | *What must never break* — invariants, env, credentials location, "don't touch X because Y" | Overwrite-append (grows monotonically) | Small (< 2 KB target) |
 | `task.md` | *What's happening now + next up* — persisted `todo` state | Overwritten each hand-off | Small |
 | `walkthrough.md` | *What happened, why, and any surprises* — living work-memory, pruned when items resolve | **Editable** (add on hand-off, prune resolved items) | Bounded (target < 20 KB) |
-| `open-questions.md` | *What's blocked pending human input* | Overwritten; entries removed when resolved | Small |
+| `open-questions.md` | *What's blocked pending human input* — **only** items requiring a **human** answer. Agent-side blockers (waiting on API/build/tool) stay in `task.md` with `[!]` marker. | Overwritten; entries removed when resolved | Small |
 
 ### 4.2 Optional (create only when relevant)
 
@@ -74,18 +74,16 @@ Dual-track:
 .hermes/handoff/                    # Private scratch, .gitignore'd
     context.md
     task.md
+    walkthrough.md                  # single living file, pruned on hand-off (see §9a)
     open-questions.md
     plan.md                         # optional
     review.md                       # optional
-    walkthrough/
-        2026-07-16-douyin-incremental.md
-        2026-07-15-uifid-migration.md
-        ...
-        INDEX.md                    # optional auto-generated table
 
-docs/handoff/                       # Public, git-tracked — only when user asks
-    (same layout, promoted from .hermes/handoff/ on request)
+docs/handoff/                       # Public, git-tracked snapshot — only when user promotes
+    (copy of the above, produced by explicit "promote" action; see §8 Step 4)
 ```
+
+**Why single `walkthrough.md` (not `walkthrough/*.md`):** per DECISIONS ②, walkthrough is *working memory*, not audit log. A single file makes L3 load cost bounded by pruning discipline (§9a) — long-term audit trail already lives in `git log` and `session_search`. Per-session files created a pruning + indexing problem and were explicitly rejected.
 
 **Rule:** `hand-off` writes to `.hermes/handoff/` by default. Promoting to `docs/handoff/` is an explicit user choice ("这批留档" / "commit into repo").
 
@@ -101,13 +99,11 @@ Git worktree / branch-parallel work is a real problem but out of scope for MVP. 
 ---
 kind: handoff/task            # one of: context, task, walkthrough, open-questions, plan, review
 version: 1
-project: <repo-name-or-path>
-branch: <git-branch>
-last_updated: 2026-07-16T14:20:00+08:00
-last_verified: 2026-07-16T14:20:00+08:00   # when reality-check last ran
+last_updated: 2026-07-16T14:20:00+08:00     # MUST include timezone offset (avoid Windows/Unix parse drift)
+last_verified: 2026-07-16T14:20:00+08:00    # when reality-check last ran; use `SKIPPED` if skipped
 last_agent: claude-sonnet-4 via Hermes/devops
-next_agent: <blank until claimed>
-session_id: <hermes-session-id>            # for session_search back-links
+last_writer: hand-off        # hand-off | take-over | user | migration — for audit / anti-hallucination
+session_id: <hermes-session-id>            # optional; include only if runtime exposes it
 status: in-progress | blocked | phase-complete | archived
 ---
 
@@ -117,6 +113,8 @@ status: in-progress | blocked | phase-complete | archived
 ```
 
 The frontmatter is what makes take-over's **L1 scan** cheap: an agent can slurp all frontmatter and know the shape of everything before deciding what to load.
+
+**MVP frontmatter is intentionally minimal.** Fields deferred (see §13): `project` (implied by cwd), `branch` (v2, requires branch-prefix layout), `next_agent` (no claim protocol yet). Do not invent extra fields — every field must have a reader in `hand-off` or `take-over`.
 
 ## 7. The Take-Over Flow
 
@@ -137,9 +135,10 @@ Step 2  Reality check (reconciliation)     ← the hard part
 Step 3  Layered load
         L1 (always):  context.md + task.md + open-questions.md
         L2 (on demand): plan.md, review.md, current-phase excerpt of plan.md
-        L3 (reference only, do NOT auto-load): walkthrough/*.md
-                       Load a specific walkthrough only when digging into
-                       a specific past decision. Otherwise use `session_search`
+        L3 (reference only, do NOT auto-load): walkthrough.md
+                       Read the single walkthrough.md only when digging
+                       into a specific past decision surfaced by L1/L2.
+                       For older/pruned detail, use `session_search`
                        against the recorded session_id.
 
 Step 4  Restore todo
@@ -155,6 +154,16 @@ Step 6  Report to user
         "Previous agent: <last_agent>. Last verified: <ts>.
          Done: … Now: … Next: … Blocked on: …
          Where would you like to resume?"
+
+Step 7  plan-mode coexistence check
+        If `.hermes/plans/` exists (plan-mode artifacts), do NOT auto-merge.
+        Include one line in the Step 6 report:
+          "Detected plan-mode artifacts in .hermes/plans/. Import manually? (see clarify)"
+        On explicit user request, offer a `clarify` with:
+          - Ignore (default) — keep both directories independent
+          - Import plan-mode's plan.md → .hermes/handoff/plan.md (copy, one-shot)
+          - Show diff first
+        Never modify `.hermes/plans/` from this skill.
 ```
 
 **Compression is by layering, not summarization.** L1 is intentionally kept small (target < 3 KB total for all three files) so the take-over cost is bounded regardless of project size.
@@ -172,13 +181,15 @@ Step 1  Reality check (anti-hallucination)
 
 Step 2  Update core docs
         a) task.md      ← dump current `todo` verbatim; do not "summarize" open items away.
-        b) walkthrough/<today>-<slug>.md ← NEW file, append-only.
-           Contents:
-             - Decisions made & why (with rationale)
-             - Files changed (with paths)
-             - Surprises / gotchas discovered
-             - session_id for back-reference
-             - NOT a transcript replay — decisions + deltas + surprises only
+        b) walkthrough.md ← UPDATE the single living file.
+           - APPEND today's entry (dated + slug header) with:
+               * Decisions made & why (rationale)
+               * Files changed (paths)
+               * Surprises / gotchas discovered
+               * session_id back-reference (if runtime exposes it; else omit)
+               * NOT a transcript replay — decisions + deltas + surprises only
+           - PRUNE resolved / obsolete entries per §9a (Smart Cleanup).
+           - Target size < 20 KB. If exceeded, tighten pruning; do NOT split into per-session files.
         c) open-questions.md ← add any blockers found this session.
         d) context.md   ← only if a new invariant was learned. Additive.
         e) plan.md / review.md ← only if produced/updated this session.
@@ -189,7 +200,7 @@ Step 3  Update frontmatter
         - Set last_agent, session_id.
         - Set status appropriately (in-progress / blocked / phase-complete).
 
-Step 4  Commit decision (promote path only)
+Step 4  Promote decision (optional; default = private)
         `.hermes/handoff/` is gitignored, so no commit action for private scratch.
         Ask via AskUserQuestion (clarify) with structured choices:
           "How to handle this handoff?"
@@ -197,6 +208,14 @@ Step 4  Commit decision (promote path only)
             - Promote to docs/handoff/ and commit now
             - Promote to docs/handoff/, stage but don't commit
         Default: Leave private.
+
+        **Promote semantics = COPY snapshot, not move.**
+        - `.hermes/handoff/` remains the live working set and keeps evolving.
+        - `docs/handoff/` receives a copy with `frozen: true` added to each
+          file's frontmatter. Skills MUST NOT re-touch frozen files on
+          subsequent runs; they are a historical snapshot for humans / PR review.
+        - To publish a new snapshot later, promote again → overwrites the frozen copy.
+
         If "commit now" chosen, offer default message
           "docs(handoff): <slug> — <status>"
         and let user edit before running git commit.
@@ -309,17 +328,21 @@ Rationale: both skills are peers (neither is subordinate); protocol and template
 
 ## 13. Open Questions (Not Yet Decision Points)
 
-- Does `walkthrough/INDEX.md` auto-regenerate, or is it maintained manually?
 - Should `context.md` be additive-only, or allowed to correct-in-place (with `walkthrough` entry recording the correction)?
 - How does this interact with `subagent-driven-development`? Sub-agents don't currently write handoff docs — should orchestrators propagate context to them?
 - Any hook for auto-suggesting `hand-off` when context window > 75%? (Runtime-dependent; may not be portable.)
+- Concurrent hand-off from two live sessions writing to the same `.hermes/handoff/` — MVP assumes serial execution; needs a lock file or timestamp-based conflict prompt in v2.
+- Multi-branch layout — prefix with branch (`.hermes/handoff/<branch>/…`); deferred (see §5 caveat). Reintroduces `branch:` frontmatter field.
+- `next_agent` claim protocol — currently no way to signal "I'm about to pick this up"; if collaborative workflows appear, add a claim step.
+- Dry-run mode for `hand-off` — print diff of every file it would write, confirm via `clarify` before landing. Useful especially for first Smart Cleanup run on a project.
 
 ## 14. References
 
 - `../../plan-mode/SKILL.md` — **prior art / inspiration only**. Demonstrates the "write-only workflow" pattern this design extends into a bidirectional protocol. No runtime coupling: `hand-off` / `take-over` do not read `.hermes/plans/` or invoke `plan-mode`.
 - `../../../spec/agent-skills-spec.md` — SKILL.md format the two implementing skills will conform to.
 - Hermes primitives: `memory`, `todo`, `session_search`, `skill_manage`.
+- `./DECISIONS.md` — append-only log of resolved design decisions; consult before proposing changes that touch ①②③④.
 
 ---
 
-*End of PROTOCOL.md. Next step: resolve ①②③④ in `DECISIONS.md`, then draft `skills/hand-off/SKILL.md` and `skills/take-over/SKILL.md` referencing this file.*
+*End of PROTOCOL.md. Status: v0.2 (2026-07-16 rev-2) — MVP simplifications applied. Next step: draft `skills/hand-off/SKILL.md` and `skills/take-over/SKILL.md` referencing this file.*
