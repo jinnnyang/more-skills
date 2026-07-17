@@ -1,12 +1,12 @@
 ---
 kind: walkthrough
 version: 1
-last_updated: '2026-07-17T03:52:59+00:00'
-last_verified: 2026-07-17 02:45:00+00:00
-last_agent: hermes-agent-devops
+last_updated: '2026-07-17T07:00:00+00:00'
+last_verified: '2026-07-17T07:00:00+00:00'
+last_agent: ark-code-latest via Hermes/devops
 last_writer: hand-off
-session_id: 2026-07-17-v05-adoption
-status: in-progress
+session_id: rev-D-close-out-20260717T145717
+status: phase-complete
 ---
 
 # Living Work Memory & Walkthrough — `skills/` scope
@@ -61,15 +61,35 @@ status: in-progress
 
 Both bugs originally caught by the rev-B eat-your-own-dogfood test on this repo.
 
-## 2026-07-17 — review-optimizations <!-- decision -->
+## 2026-07-17 — rev-D: CRITICAL fixes before independent-development split <!-- decision -->
 
-**Decision.** Completed a comprehensive expert review (Protocol, Code, and UX expert subagents) of the `hand-off` and `take-over` skills. Applied 10 critical reliability and robustness optimizations to `reconcile.py` and both `SKILL.md` files.
+**Decision.** Pre-split design-doc review of `hand-off` and `take-over` (both v1.3.0 SKILL / v0.3-rev-A PROTOCOL) surfaced 3 CRITICAL findings that would cause the first divergent commit to introduce a protocol-vs-SKILL contradiction. Fixed atomically before opening independent development.
 
-**Rationale.** Expert reviews identified concurrency TOCTOU issues in locking, silent data loss during HTML comment stripping, Git CWD mismatch when executing nested scope checks, relative task path failures, and UX interaction blockages (lack of Yield instructions on fallback questions, plan import task-sync gaps, and lost hand-off soft conflicts).
+**Findings & fixes (all in the same commit):**
+1. **C1** — `take-over/PROTOCOL.md` §7 code-fence structure was broken (an orphan closing fence after Step 2 leaked Steps 3–7 out of the code block, and a second lonely fence appeared at line 196). Repaired to a single fence enclosing Step 0–7. Fence count 9 → 8, even and balanced.
+2. **C2** — SOFT-conflict landing site was inconsistent across `take-over/PROTOCOL.md` §7 Step 2 (L159), §7 Step 5 (L181), §9 rule 7 (L210). Two of them still named the legacy `## Soft Conflicts (Reconciled)` / `## Soft Conflicts` section (rev-B). Unified all three to the rev-C canonical form — `questions.md` § Open, entries as `### Soft conflict · <type> · <timestamp>`. Now aligned with `take-over/SKILL.md` L120/L146/L167, `hand-off/PROTOCOL.md` §9b L248, and DECISIONS R19+R20.
+3. **C3** — `hand-off/PROTOCOL.md` L134 and `take-over/PROTOCOL.md` L136 still wrote `uv run --isolated python …`, contradicting SKILL.md and DECISIONS R16 ("do not pass `--isolated`"). Both lines rewritten to `uv run <SKILL_DIR>/scripts/reconcile.py …` with the negative guidance inline. R16 履历 preserved.
 
-**Changes implemented.**
-- `reconcile.py` (both skills): implemented atomic exclusive lock creation (`os.O_EXCL`), 2-hour TTL lock expiration, `unlock` CLI command, Git CWD binding, fallback task path resolution, line-based `_peek_kind` parsing, and regex-based multiline title matching.
-- `SKILL.md` (both skills): added proactive calling guidelines for `AskUserQuestion`, yield control turn on fallback questions, stale lock manual override instructions, task synchronization on plan import, and soft conflicts persistence.
+**W2 (also landed this session):** `_shared/session-handoff/scripts/` deleted (Q2 resolution). Was drifted 57 lines behind the hand-off/take-over copies at rev-D verification. `_shared/session-handoff/README.md` updated: 3-way sync discipline → 2-way; scripts/ marked deleted; templates/ still shared as reference.
+
+**Files changed.**
+- `skills/hand-off/PROTOCOL.md` — 1 line (C3)
+- `skills/take-over/PROTOCOL.md` — 6 lines (C1 fence + C2 three sites + C3)
+- `skills/_shared/session-handoff/README.md` — rev-D header + 2-way sync rewording (W2)
+- `skills/_shared/session-handoff/scripts/reconcile.py` — DELETED (W2)
+
+**Verification.**
+- `grep -c '^\`\`\`'` on `take-over/PROTOCOL.md`: 8 (even, balanced).
+- `grep -rn 'Soft Conflicts (Reconciled)\|## Soft Conflicts' skills/hand-off skills/take-over` → empty.
+- `grep -rn '\-\-isolated' skills/hand-off/SKILL.md skills/take-over/SKILL.md skills/hand-off/PROTOCOL.md skills/take-over/PROTOCOL.md` → only negative-guidance mentions remain; DECISIONS R16 still records the history.
+
+**Downstream.** WORTH findings (W1 docs/handoff supersede, W3 decision-ID mirror discipline, W4 R17 重号, W5 MIRROR block, W6 list-scopes depth, W7 no-git fallback) and SMALL findings deferred to independent-development phase. Session concludes with the two skills internally consistent and ready to diverge.
+
+## 2026-07-17 — rev-D close-out: this scope archived <!-- decision -->
+
+**Decision.** The `skills/` handoff scope is closed. All rev-B → rev-C rework tasks committed (see 0c56a9a, 0df58cf); rev-D CRITICAL fix committed atomically with this hand-off. Both remaining open questions (Q1/Q2) resolved and archived to `## Closed`.
+
+**Rationale.** The two skills are now sufficient to enter independent-development phase without a session-wide coordination scope. Any future work on `hand-off/` or `take-over/` in isolation will spin up its own scope at that subtree if needed. This scope becomes historical.
 
 ---
 

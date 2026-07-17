@@ -1,12 +1,12 @@
 ---
 kind: context
 version: 1
-last_updated: 2026-07-17T03:52:00+00:00
-last_verified: 2026-07-17T03:52:00+00:00
-last_agent: Antigravity
+last_updated: 2026-07-17T07:00:00+00:00
+last_verified: 2026-07-17T07:00:00+00:00
+last_agent: ark-code-latest via Hermes/devops
 last_writer: hand-off
-session_id: b041c687-73d0-47f4-9d8b-bf878a50422e
-status: in-progress
+session_id: rev-D-close-out-20260717T145717
+status: phase-complete
 ---
 
 # Context & Invariants — `skills/` scope

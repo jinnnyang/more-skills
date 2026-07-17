@@ -1,12 +1,12 @@
 ---
 kind: questions
 version: 1
-last_updated: '2026-07-17T03:52:59+00:00'
-last_verified: 2026-07-17 02:45:00+00:00
-last_agent: hermes-agent-devops
+last_updated: '2026-07-17T07:00:00+00:00'
+last_verified: '2026-07-17T07:00:00+00:00'
+last_agent: ark-code-latest via Hermes/devops
 last_writer: hand-off
-session_id: 2026-07-17-v05-adoption
-status: in-progress
+session_id: rev-D-close-out-20260717T145717
+status: phase-complete
 ---
 
 # Questions — `skills/` scope
@@ -20,20 +20,7 @@ status: in-progress
 
 ## Open
 
-### Q1 · Recover original review items S2 and S5
-
-The review-cycle-2 close-out lists SUGGEST items S1, S3, S4, S6, S7 as closed but leaves S2 and S5 unaccounted for. The original review document was consumed as context; specific item content wasn't preserved verbatim in DECISIONS.md.
-
-**Ask:** if the reviewer (刘工) still has the original 4-tier review report, please attach it so the next hand-off can either close S2/S5 or explicitly DEFER them. If unrecoverable, treat S2/S5 as DEFER and archive this question.
-
-### Q2 · Introduce CI enforcement for 3-way byte-identical sync?
-
-The manual sync discipline for `scripts/reconcile.py` and `templates/*.md` (three byte-identical copies) currently relies on the author remembering to `diff -q` before each commit. A pre-commit hook plus a CI check would remove this footgun.
-
-**Ask:** priority?
-- (a) Now — write the hook + CI check as the next task.
-- (b) After first real drift is observed.
-- (c) Never — trust the manual discipline.
+- None.
 
 ## Closed
 
@@ -56,3 +43,26 @@ User picked (A): single `questions.md` with `## Open` + `## Closed` sections. Re
 
 <!-- resolved -->
 User answer: scope is defined by the task's range, not by any directory role. `list-scopes` enumerates neutrally; agent + user negotiate per task. For the current session-handoff rework, scope = `skills/`.
+### Q1 · Recover original review items S2 and S5
+
+<!-- resolved -->
+
+The review-cycle-2 close-out lists SUGGEST items S1, S3, S4, S6, S7 as closed but leaves S2 and S5 unaccounted for. The original review document was consumed as context; specific item content wasn't preserved verbatim in DECISIONS.md.
+
+**Ask:** if the reviewer (刘工) still has the original 4-tier review report, please attach it so the next hand-off can either close S2/S5 or explicitly DEFER them. If unrecoverable, treat S2/S5 as DEFER and archive this question.
+
+**Resolution (2026-07-17 rev-D, 刘工):** Original review report unrecoverable. S2 and S5 are treated as DEFER — content lost, no action item can be reconstructed. Archive.
+
+### Q2 · Introduce CI enforcement for 3-way byte-identical sync?
+
+<!-- resolved -->
+
+The manual sync discipline for `scripts/reconcile.py` and `templates/*.md` (three byte-identical copies) currently relies on the author remembering to `diff -q` before each commit. A pre-commit hook plus a CI check would remove this footgun.
+
+**Ask:** priority?
+- (a) Now — write the hook + CI check as the next task.
+- (b) After first real drift is observed.
+- (c) Never — trust the manual discipline.
+
+**Resolution (2026-07-17 rev-D, 刘工):** Three-way sync discipline retired. Reasoning: `_shared/session-handoff/scripts/reconcile.py` had already drifted 57 lines behind `hand-off/scripts/reconcile.py` at rev-D verification. Rather than resurrect the third copy and enforce it with tooling, delete `_shared/scripts/` entirely and keep only two byte-identical copies (`hand-off/scripts/` and `take-over/scripts/`). README updated. Pre-commit hook considered but deferred — 2-way manual sync is small enough surface that a hook is over-engineering for now. Re-open if drift is observed between the two remaining copies.
+
