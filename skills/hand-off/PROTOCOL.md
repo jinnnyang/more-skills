@@ -131,7 +131,7 @@ The frontmatter is what makes take-over's **L1 scan** cheap: an agent can slurp 
 
 Triggered by: user says "先到这" / "换你上" / `/handoff`; auto-suggested when context > 75% or when a `todo` phase completes.
 
-All Python invocations use `uv run --isolated python <SKILL_DIR>/scripts/reconcile.py …` where `<SKILL_DIR>` is this skill's directory.
+All Python invocations use `uv run <SKILL_DIR>/scripts/reconcile.py …` where `<SKILL_DIR>` is this skill's directory. `uv run` is already isolated for scripts with inline `# /// script` metadata — do not pass `--isolated`.
 
 ```
 Step 0  Bootstrap Check

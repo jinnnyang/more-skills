@@ -133,7 +133,7 @@ The frontmatter is what makes take-over's **L1 scan** cheap: an agent can slurp 
 
 Triggered by: loading the skill; user says "continue previous work" / "接着之前的做".
 
-All Python invocations use `uv run --isolated python <SKILL_DIR>/scripts/reconcile.py …` where `<SKILL_DIR>` is this skill's directory.
+All Python invocations use `uv run <SKILL_DIR>/scripts/reconcile.py …` where `<SKILL_DIR>` is this skill's directory. `uv run` is already isolated for scripts with inline `# /// script` metadata — do not pass `--isolated`.
 
 ```
 Step 0  Bootstrap Check & Initial Loading
@@ -156,10 +156,10 @@ Step 2  Reality check (reconciliation)     ← Offloaded to reconcile.py
           * Sanity-existence of key files mentioned in task.md.
           * Frontmatter validity (kind enum + timestamp sanity).
           * `--apply-soft-conflicts` auto-appends SOFT conflicts to
-            `questions.md` under `## Soft Conflicts (Reconciled)`, so
-            the take-over agent never rewrites that section itself.
+            `questions.md` under `## Open` as `### Soft conflict ·
+            <type> · <timestamp>` entries, so the take-over agent
+            never rewrites that section itself.
           * Optional: run declared smoke test if fast (< 10s) and specified as REQUIRED in task.md.
-```
 
 Step 3  Layered load
         L1 (always):  context.md + task.md + questions.md
@@ -178,7 +178,7 @@ Step 5  Conflict handling
           HARD → halt, `clarify` prompt with structured choices, block loading.
                  If running in non-interactive/CI mode, HALT times out after 5 minutes,
                  writes `conflict_pending.json` with details, and aborts execution.
-          SOFT → append to `questions.md` under a structured `## Soft Conflicts` section with UTC timestamp. Continue L1 load.
+          SOFT → append to `questions.md` under `## Open` as `### Soft conflict · <type> · <timestamp>` entries with UTC timestamp. Continue L1 load.
           AMBIGUOUS → escalate to HARD (fail-safe).
 
 Step 6  plan-mode coexistence check (Pre-empt final report)
@@ -207,7 +207,7 @@ Both `hand-off` and `take-over` must obey (this file focuses on what `take-over`
 4. **Reality trumps documentation on hard conflicts.** See §9b — HARD conflicts halt loading until the user resolves them.
 5. **Atomic Write Rule.** Any write take-over performs (e.g. logging SOFT conflicts to `questions.md`, initializing empty files) must write to a `.tmp` file and rename (POSIX `rename()`) to replace the target.
 6. **Script-assisted Execution.** Reality-check and conflict classification are offloaded to this skill's `scripts/reconcile.py` rather than done purely in LLM memory.
-7. **On take-over conflict, apply §9b tiered handling.** Hard conflicts halt via `clarify`; soft conflicts are logged to `questions.md` under a structured `## Soft Conflicts` section with UTC timestamp, and loading continues. Never silently reconcile away a hard conflict.
+7. **On take-over conflict, apply §9b tiered handling.** Hard conflicts halt via `clarify`; soft conflicts are logged to `questions.md` under `## Open` as `### Soft conflict · <type> · <timestamp>` entries with UTC timestamp, and loading continues. Never silently reconcile away a hard conflict.
 
 ## 9b. Take-Over Conflict Handling (tiered)
 
