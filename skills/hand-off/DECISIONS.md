@@ -121,4 +121,48 @@ Following the comprehensive review of PROTOCOL v0.2, several critical reliabilit
 
 ---
 
-*Next: address remaining review findings (Windows path handling, parser hardening, dry-run mode) — see PROTOCOL §13 open questions.*
+## 2026-07-17 (rev-B) — Post-review script hardening
+
+Second round of design-doc-review findings, focused on the scripts and cleanup semantics. `_shared/PROTOCOL.md` / `_shared/DECISIONS.md` are now frozen historical snapshots; further protocol changes land only in each skill's own copy.
+
+### R7 · Frontmatter parser: switch to pyyaml (was: hand-rolled) (cross-cutting)
+**Decision:** `reconcile.py` now uses `pyyaml` via uv's inline script metadata (`# /// script … dependencies = ["pyyaml>=6.0"] # ///`). Bare `python` invocations require pyyaml on the ambient interpreter; `uv run` installs it automatically.
+**Rationale:** the hand-rolled `line.split(':', 1)` parser choked on quoted values, inline comments, and the `kind` enum requirement from v0.3 ⑥. pyyaml handles all three, plus proper timezone-aware timestamp parsing.
+**Rejected:** stdlib-only "just accept the limitations" — v0.3 ⑥'s enum validation cannot be implemented reliably without a real parser.
+
+### R8 · CLI evidence transport: stdin / --content-file (was: --content arg only) (hand-off specific)
+**Decision:** `write-atomic` accepts three payload sources in preference order: `--content-file <path>`, stdin (piped), `--content <inline>`. SKILL.md steers agents to `--content-file` for anything non-trivial.
+**Rationale:** Windows git-bash caps shell argv at ~32 KB; the previous `--content "…"` API broke on real walkthrough sizes and required aggressive escaping of every quote/newline/`$` in the payload. File-based transport removes all escaping and lifts the size cap.
+
+### R9 · Cross-platform file-reference detection (cross-cutting)
+**Decision:** `check-reality`'s "missing file" check now matches Windows (`C:\…` / `C:/…`), POSIX (`/foo/bar`), and MSYS (`/c/foo`) path shapes; MSYS is normalized to Windows before `pathlib.Path.exists()`. Documentation-looking tokens (`/http…`, `/dev/…`, `/tmp/…`, URLs, tokens without a `.ext` filename tail) are filtered out to prevent false HARD conflicts. Content inside fenced code blocks is stripped before scanning.
+**Rationale:** the earlier POSIX-only regex was silently a no-op on Windows and produced false positives on Linux (code examples treated as filesystem claims).
+
+### R10 · Explicit lifecycle markers replace free-text grep (hand-off specific)
+**Decision:** Smart Cleanup CLEAR/KEEP classification now looks for explicit HTML-comment markers (`<!-- keep -->`, `<!-- resolved -->`) plus a small keyword set in section headers (`lesson`, `surprise`, `decision`, `invariant`). The previous `"resolved" in body.lower()` heuristic is removed.
+**Rationale:** free-text grep matched sentences like "not resolved yet" or "resolved before we…" and deleted live entries. HTML comments are unambiguous, invisible in rendered markdown, and machine-checkable.
+
+### R11 · Two-phase Smart Cleanup (dry-run → apply) (hand-off specific)
+**Decision:** `reconcile.py clean-up` requires a mutually-exclusive `--dry-run` or `--apply` flag. SKILL.md Step 3 mandates dry-run first, batched `clarify` on UNSURE items, then apply.
+**Rationale:** the earlier one-shot mode landed CLEAR/STALE deletions to disk before the user saw the plan, defeating §9a's "err toward UNSURE" intent.
+
+### R12 · SOFT conflict logging by script, not agent (take-over specific — mirrored here for cross-skill awareness)
+**Decision:** `check-reality --apply-soft-conflicts` writes SOFT conflicts directly into `open-questions.md` under `## Soft Conflicts (Reconciled)`. `take-over` no longer needs to construct that section itself.
+**Rationale:** consistent with v0.3 ① (script-assisted execution). Removes another surface where the agent could hallucinate the structure.
+
+### R13 · Serializer double-newline fix (S3) (cross-cutting)
+**Decision:** `dump_frontmatter` closes the fence with exactly one `\n` and `lstrip("\n")`s the body before concatenation. Previously each round-trip added a blank line at the body top.
+**Rationale:** trivial correctness fix; a walkthrough re-serialized N times gained N blank lines under the old serializer.
+
+### R14 · Auxiliary evidence: `<session-tools-log>` demoted (cross-cutting)
+**Decision:** The `<session-tools-log>` block is documented and validated as **auxiliary evidence** only. Reality-check uses `git status --short` + `git log -5 --name-only` as the primary evidence source; tools-log entries lacking git presence surface as SOFT conflicts rather than being trusted or rejected on their own.
+**Rationale:** the Hermes runtime does not currently expose a reliable structured tool-call history, so agent-constructed tools-log blocks are self-reported and cannot substitute for git evidence (v0.3 ③ was implicitly self-referential).
+
+### R15 · `validate` command added (cross-cutting)
+**Decision:** New `reconcile.py validate` subcommand runs frontmatter validation across all handoff docs (kind enum + timezone-aware timestamps + status enum + last_writer enum). `take-over` Step 1 calls it before loading any body content.
+**Rationale:** enforces v0.3 ⑥ kind enum without waiting for the fuller `check-reality` pass.
+
+### R16 · CLI does NOT pass `--isolated` to uv (documentation fix)
+**Decision:** SKILL.md invocations use `uv run <path> …` (no `--isolated`).
+**Rationale:** `uv run` is already isolated for scripts declaring inline `# /// script` metadata; passing `--isolated` produces a warning and no additional effect.
+

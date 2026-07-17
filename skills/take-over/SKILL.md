@@ -4,7 +4,7 @@ description: |
   Guides the agent through a structured session resume/take-over workflow.
   Triggers when the session starts or when the user says "continue previous work" or "接着之前的做".
   Discovers prior handoff state, performs Git reality reconciliation, and restores task checklists.
-version: 1.0.0
+version: 1.1.0
 author: 刘工 + Hermes Agent
 license: MIT
 metadata:
@@ -25,8 +25,9 @@ The companion skill `hand-off` implements the closing side of the protocol. Each
 
 ## Prerequisites
 
-- **`uv`** — required. This skill runs its helper Python script via `uv run --isolated python …`. Check with `command -v uv`.
+- **`uv`** — required. This skill runs its helper Python script via `uv run …` and relies on inline script metadata to auto-install `pyyaml`. Check with `command -v uv`.
 - **`git`** — required for reality-check (`git status`, `git log`).
+- **Python ≥ 3.11** — resolved automatically by uv from the inline `requires-python`.
 
 ## When to Run This Skill
 
@@ -37,66 +38,74 @@ The companion skill `hand-off` implements the closing side of the protocol. Each
 
 ## Take-Over Execution Workflow
 
-Follow these steps precisely. **All Python invocations use `uv run --isolated python <SKILL_DIR>/scripts/reconcile.py …`** where `<SKILL_DIR>` is the directory of this SKILL.md file.
+Follow these steps precisely. **All Python invocations use `uv run <SKILL_DIR>/scripts/reconcile.py …`** where `<SKILL_DIR>` is the directory of this SKILL.md file. `uv run` is inherently isolated for scripts with inline metadata — do not pass `--isolated`.
 
 ### Step 0: Bootstrap Check
 Check if `.hermes/handoff/` exists (project-scoped, in the current working directory). If the directory is missing:
 1. Run initialization:
    ```bash
-   uv run --isolated python <SKILL_DIR>/scripts/reconcile.py init --agent "{agent_name}" --session-id "{session_id}" --writer take-over
+   uv run <SKILL_DIR>/scripts/reconcile.py init --agent "{agent_name}" --session-id "{session_id}" --writer take-over
    ```
 2. Report: *"No previous handoff history found. Initialized empty session."*
 3. Exit take-over flow and proceed to greet the user.
 
 ### Step 1: Discover Handoff State
 Scan `.hermes/handoff/` (and `docs/handoff/` if present) for the document set.
-Read the YAML frontmatter of each file first.
-Determine freshness: Compare the `last_updated` timestamps against the latest Git commit time:
+Validate frontmatter first (kind enum + timestamp sanity):
+```bash
+uv run <SKILL_DIR>/scripts/reconcile.py validate
+```
+`errors` in the JSON output are HARD conflicts — halt and surface via `clarify` before loading any body content.
+
+Determine freshness: compare `last_updated` against the latest Git commit time:
 ```bash
 git log -1 --format=%cI
 ```
 
 ### Step 2: Reality Check & Reconciliation
-Offload reconciliation checks to the Python helper script:
+Offload reconciliation to the helper (and immediately record any SOFT conflicts):
 ```bash
-uv run --isolated python <SKILL_DIR>/scripts/reconcile.py check-reality
+uv run <SKILL_DIR>/scripts/reconcile.py check-reality --apply-soft-conflicts
 ```
-- Parse the output JSON which details detected discrepancies, verifying:
-  - Git status uncommitted modifications vs. walkthrough notes.
-  - Latest commits matching claims.
-  - File existence sanity checks.
-  - Walkthrough `<session-tools-log>` metadata validation.
+- Parse the JSON output. It contains `hard_conflicts`, `soft_conflicts`, and `applied_soft_conflicts` (count written to `open-questions.md` under `## Soft Conflicts (Reconciled)`).
+- Handling per §9b of `PROTOCOL.md`:
+  - HARD → skip Step 3; jump directly to Step 5 conflict resolution.
+  - SOFT → already logged to `open-questions.md`; continue to Step 3.
 
 ### Step 3: Layered Load
 To control context usage, follow the layered load rules:
 - **L1 (Always Load)**: Read the contents of `context.md`, `task.md`, and `open-questions.md`.
-- **L2 (Load on Demand)**: Load `plan.md` or `review.md` only when entering tasks that reference them.
+- **L2 (Load on Demand)**: Load `plan.md` or `review.md` only when entering tasks that reference them. Heuristic: if `task.md` body contains the literal string `plan.md` or `review.md`, load them at Step 3 too.
 - **L3 (Reference Only - Do NOT Auto-load)**: `walkthrough.md` must not be loaded automatically. Only inspect it or query past session logs via `session_search` when deep-diving into specific past decisions.
 
 ### Step 4: Restore Checklist
 Parse `task.md`'s open tasks checklist and populate the agent runtime `todo` list.
 
+**Reordering note**: if Step 6 (plan-mode coexistence) imports `plan.md`, re-run Step 4 against the updated `task.md` before Step 7 reports.
+
 ### Step 5: Conflict Handling
-Handle discrepancies identified in Step 2 according to their tiers:
+Handle discrepancies identified in Step 2 according to their tiers (§9b of `PROTOCOL.md`):
 - **HARD Conflicts** (e.g., claimed task done but no Git/code evidence):
-  - Halt loading. Present the conflicts to the user via `AskUserQuestion` / `clarify` with options: *Trust Handoff Docs / Trust Git Reality / User Explains*.
-  - *Non-interactive Timeout*: If running in non-interactive/CI mode, wait 5 minutes; if no response, write details to `conflict_pending.json` and abort execution.
-- **SOFT Conflicts** (e.g., `last_verified` is older than 7 days, files renamed/moved but intact):
-  - Log details to `open-questions.md` under a structured `## Soft Conflicts (Reconciled)` section with UTC timestamp. Continue loading.
-- **AMBIGUOUS Conflicts**: Escalate to HARD (fail-safe).
+  - Halt loading. Present the conflicts to the user via `clarify` with options: *Trust Handoff Docs / Trust Git Reality / User Explains*.
+  - *Non-interactive Timeout*: If running in non-interactive/CI mode, wait 5 minutes; if no response, write details to `.hermes/handoff/conflict_pending.json` via `write-atomic` and abort execution.
+- **SOFT Conflicts** — already logged by Step 2. Nothing more to do here; the take-over summary will report the count.
+- **AMBIGUOUS Conflicts** — the helper escalates these to HARD (fail-safe).
 
 ### Step 6: Plan-Mode Coexistence Check
 If `.hermes/plans/` exists (plan-mode planning artifacts):
 - Do NOT auto-merge.
-- Prompt the user via `AskUserQuestion` / `clarify` with structured choices:
+- Prompt the user via `clarify` with structured choices:
   - *Ignore (default)*: Keep plan-mode and handoff directories independent.
-  - *Import plan.md*: Copy plan-mode's `plan.md` to `.hermes/handoff/plan.md` (one-shot copy).
+  - *Import plan.md*: Copy plan-mode's `plan.md` to `.hermes/handoff/plan.md` (one-shot copy via `write-atomic`).
   - *Show diff*: Compare plan-mode artifacts first.
+
+If import chosen, re-run Step 4 against the updated `task.md` so the final report reflects any newly imported tasks.
 
 ### Step 7: Summary Report to User
 Print a resume greeting:
 ```
 Previous agent: {last_agent}. Last verified: {last_verified_timestamp}.
+N soft conflicts logged, M hard conflicts resolved.
 Done: ...
 Now/Next: ...
 Blocked on: ...

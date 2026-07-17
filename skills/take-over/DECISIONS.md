@@ -117,4 +117,54 @@ Following the comprehensive review of PROTOCOL v0.2.
 
 ---
 
-*Next: address remaining review findings (Windows path handling, parser hardening, tools-log evidence source) — see PROTOCOL §13 open questions.*
+## 2026-07-17 (rev-B) — Post-review script hardening
+
+Second round of design-doc-review findings, focused on the scripts and take-over reconciliation semantics. `_shared/PROTOCOL.md` / `_shared/DECISIONS.md` are now frozen historical snapshots; further protocol changes land only in each skill's own copy.
+
+### R7 · Frontmatter parser: switch to pyyaml (cross-cutting)
+**Decision:** `reconcile.py` now uses `pyyaml` via uv's inline script metadata. Bare `python` invocations require pyyaml on the ambient interpreter; `uv run` installs it automatically.
+**Rationale:** the hand-rolled parser choked on quoted values, inline comments, and the `kind` enum requirement from v0.3 ⑥.
+**Impact on take-over:** frontmatter validation (`reconcile.py validate`) now enforces the kind enum reliably before Step 3 loads any body content.
+
+### R8 · CLI evidence transport: stdin / --content-file (cross-cutting)
+**Decision:** `write-atomic` accepts `--content-file <path>`, stdin, or `--content <inline>` — SKILL.md steers agents to file-based transport.
+**Rationale:** Windows argv size cap made the previous `--content "…"` API break on real handoff-file sizes.
+**Impact on take-over:** the `conflict_pending.json` write on non-interactive HARD-conflict timeout now uses `--content-file`.
+
+### R9 · Cross-platform file-reference detection (cross-cutting)
+**Decision:** `check-reality`'s "missing file" check handles Windows / POSIX / MSYS paths and filters out documentation-looking tokens (URLs, `/tmp/…` examples, tokens without a `.ext` tail).
+**Rationale:** the previous POSIX-only regex was silently a no-op on Windows and produced false HARD conflicts on Linux.
+
+### R10 · Explicit lifecycle markers replace free-text grep (referenced by take-over via mirrored templates)
+**Decision:** Smart Cleanup CLEAR/KEEP classification uses `<!-- keep -->` / `<!-- resolved -->` HTML markers, not free-text `"resolved"` grep.
+**Rationale:** free-text matched sentences like "not resolved yet" and deleted live entries.
+**Impact on take-over:** open-questions.md sections created by `take-over` (SOFT conflicts) will be preserved automatically because the `## Soft Conflicts (Reconciled)` heading is exempted from cleanup and its entries are dated but not marked resolved.
+
+### R11 · Two-phase Smart Cleanup (dry-run → apply) (hand-off specific, mirrored for awareness)
+**Decision:** `clean-up` requires `--dry-run` or `--apply`; dry-run first, then apply after user confirmation.
+**Rationale:** consistent with §9a "err toward UNSURE"; the previous one-shot mode landed deletions before the user saw the plan.
+
+### R12 · SOFT conflict logging by script, not agent (take-over specific)
+**Decision:** `check-reality --apply-soft-conflicts` writes SOFT conflicts directly into `open-questions.md` under `## Soft Conflicts (Reconciled)` with UTC timestamp and `⚠️` marker. `take-over` Step 2 uses this flag; Step 5 no longer constructs the section itself.
+**Rationale:** consistent with v0.3 ① (script-assisted execution). Removes another surface where the agent could hallucinate the section shape or drift from the format take-over's next run expects.
+
+### R13 · Serializer double-newline fix (cross-cutting)
+**Decision:** `dump_frontmatter` avoids the previous serializer's double-newline bug on body concatenation.
+**Rationale:** trivial correctness fix; matters more for take-over than hand-off because take-over re-serializes on every SOFT-conflict apply.
+
+### R14 · Auxiliary evidence: `<session-tools-log>` demoted (cross-cutting)
+**Decision:** `<session-tools-log>` is auxiliary evidence only. `git status --short` + `git log -5 --name-only` are the primary evidence source for take-over's reconciliation; tools-log entries lacking git presence surface as SOFT conflicts.
+**Rationale:** the Hermes runtime does not currently expose a reliable structured tool-call history, so agent-constructed tools-log blocks cannot substitute for git evidence.
+
+### R15 · `validate` command added (take-over specific — new Step 1 sub-check)
+**Decision:** New `reconcile.py validate` subcommand runs frontmatter validation across all handoff docs. `take-over` Step 1 calls it before loading any body content and treats parse errors as HARD conflicts.
+**Rationale:** enforces v0.3 ⑥ kind enum + timezone-aware timestamps + status/writer enum without waiting for the fuller `check-reality` pass. Any doc that fails validation halts loading immediately, preventing garbage-in propagation to the runtime `todo`.
+
+### R16 · CLI does NOT pass `--isolated` to uv (documentation fix)
+**Decision:** SKILL.md invocations use `uv run <path> …` (no `--isolated`).
+**Rationale:** `uv run` is already isolated for scripts declaring inline `# /// script` metadata; passing `--isolated` produces a warning and no additional effect.
+
+### R17 · Step ordering: re-restore todo after plan-mode import (take-over specific)
+**Decision:** SKILL.md Step 4 (Restore Checklist) is re-run at the end of Step 6 (Plan-Mode Coexistence) if the user chose "Import plan.md". The final Step 7 summary reflects the reconciled task list.
+**Rationale:** DECISIONS 2026-07-16 v0.3 ⑤ ("Pre-empt Plan-Mode Merge Check") intended the report to be up-to-date, but Step 4's original position (before Step 6) meant an imported plan.md's tasks never made it into `todo`.
+

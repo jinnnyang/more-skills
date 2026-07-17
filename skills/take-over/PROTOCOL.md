@@ -131,11 +131,17 @@ Step 1  Discover
         - Determine freshness: last_updated vs `git log -1 --format=%cI`.
 
 Step 2  Reality check (reconciliation)     ← Offloaded to reconcile.py
-        - Execute reality-check via reconcile.py to verify:
-          * `git status --short`             → uncommitted changes?
-          * `git log -5 --oneline`           → do commit messages match walkthrough claims?
-          * Cross-reference walkthrough's `<session-tools-log>` metadata to verify tool call history.
+        - Execute `reconcile.py check-reality --apply-soft-conflicts` to verify:
+          * `git status --short`             → uncommitted changes? (PRIMARY EVIDENCE)
+          * `git log -5 --name-only`         → recent commit history (PRIMARY EVIDENCE)
+          * Optional cross-check: walkthrough's `<session-tools-log>` block is
+            AUXILIARY evidence — claims not backed by git are surfaced as SOFT
+            conflicts regardless of what tools-log says.
           * Sanity-existence of key files mentioned in task.md.
+          * Frontmatter validity (kind enum + timestamp sanity).
+          * `--apply-soft-conflicts` auto-appends SOFT conflicts to
+            `open-questions.md` under `## Soft Conflicts (Reconciled)`, so
+            the take-over agent never rewrites that section itself.
           * Optional: run declared smoke test if fast (< 10s) and specified as REQUIRED in task.md.
 
 Step 3  Layered load
@@ -178,7 +184,7 @@ Step 7  Report to user
 
 Both `hand-off` and `take-over` must obey (this file focuses on what `take-over` upholds):
 
-1. **No claims without evidence.** When surfacing "Previous session did X", cross-check `git log` or the serialized `<session-tools-log>` before repeating the claim. Otherwise mark it "attempted X, unverified" in the summary.
+1. **No claims without evidence.** When surfacing "Previous session did X", cross-check `git log` or `git status --short` before repeating the claim. The `<session-tools-log>` block is auxiliary — do NOT treat it as primary evidence. Absent primary git evidence, mark it "attempted X, unverified" in the summary.
 2. **`last_verified` timestamp is required.** If reality-check was skipped for any reason, surface `last_verified: SKIPPED` in the take-over summary.
 3. **`todo` items are never inferred.** Restore verbatim from `task.md`; do not fabricate items or drop unrecognized entries.
 4. **Reality trumps documentation on hard conflicts.** See §9b — HARD conflicts halt loading until the user resolves them.
@@ -193,7 +199,7 @@ Confidence-based classification. Every reality-check discrepancy falls into one 
 | Tier | Trigger | Action |
 |---|---|---|
 | **HARD** | Document claims "completed X" but no git/code evidence for X. Two handoff docs contradict each other. `context.md` invariant directly contradicts current code/config. | **HALT.** Present conflicts via `clarify` (structured choices): "trust doc / trust reality / user explains". Loading blocks until resolved. |
-| **SOFT** | `last_verified` older than 7 days. Referenced file was renamed/moved but content intact. `session_id` not found in `session_search` (likely pruned). | Log to `open-questions.md` with `⚠️ stale` tag under `## Soft Conflicts (Reconciled)` with UTC timestamp. Continue L1 load. Report count in take-over summary. |
+| **SOFT** | `last_verified` older than 7 days. Referenced file was renamed/moved but content intact. `session_id` not found in `session_search` (likely pruned). Tools-log entry lacks git evidence. | Auto-logged to `open-questions.md` with `⚠️ stale` tag under `## Soft Conflicts (Reconciled)` with UTC timestamp by `reconcile.py check-reality --apply-soft-conflicts`. Continue L1 load. Report count in take-over summary. |
 | **AMBIGUOUS** | Fails both categorization tests. | Escalate to HARD (fail-safe). |
 
 **Reporting:** take-over's final summary MUST state "N soft conflicts logged, M hard conflicts resolved" so the user always sees the reconciliation footprint.

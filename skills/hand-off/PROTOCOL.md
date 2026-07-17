@@ -126,21 +126,42 @@ Step 0  Bootstrap Check
         - If `.hermes/handoff/` is missing, initialize the directory structure first.
 
 Step 1  Reality check (anti-hallucination)
-        - Offload to reconcile.py's reality-check command to compute actual mutations:
-          * `git status --short`             → what's uncommitted?
-          * Scan tool-call execution history from local memory logs.
+        - Offload to `reconcile.py check-reality` to compute actual mutations:
+          * `git status --short`             → what's uncommitted? (PRIMARY EVIDENCE)
+          * `git log -5 --name-only`         → recent commits (PRIMARY EVIDENCE)
+          * Cross-reference walkthrough's optional `<session-tools-log>` block
+            against git presence — the tools-log is auxiliary, not primary;
+            entries lacking git evidence surface as SOFT conflicts, not
+            claims of correctness.
           * Diff against what task.md claims is in-progress.
 
 Step 2  Update core docs (Atomic Write Rule: write to `.tmp` first, then rename)
         a) task.md      ← dump current `todo` verbatim; do not "summarize" open items away.
         b) walkthrough.md ← UPDATE the single living file.
-           - APPEND today's entry (dated + slug header) with:
+           - APPEND today's entry with header format `## YYYY-MM-DD — <slug>`.
+             The classifier in §9a REQUIRES this format; deviation disables
+             stale-detection for that entry.
+           - Entry content:
                * Decisions made & why (rationale)
                * Files changed (paths)
                * Surprises / gotchas discovered
                * session_id back-reference (if runtime exposes it; else omit)
                * NOT a transcript replay — decisions + deltas + surprises only
-               * `<session-tools-log>` metadata: Serialize the list of actual tool calls of this session (tool name, timestamp, simplified input/output metadata).
+           - Explicit lifecycle markers (used by §9a Smart Cleanup):
+               * `<!-- keep -->` in the entry body OR any of the keywords
+                 `lesson` / `surprise` / `decision` / `invariant` in the header
+                 → classifier marks entry KEEP.
+               * `<!-- resolved -->` in the entry header or body → CLEAR.
+             Markers are the ONLY way an entry becomes CLEAR by explicit
+             signal; free-text like "we resolved this" is intentionally
+             ignored to prevent false positives.
+           - `<session-tools-log>` block (optional):
+             Serialize this session's tool calls as JSON if the runtime
+             exposes them. Reality-check treats these as AUXILIARY evidence
+             cross-referenced against `git status` + `git log` — the tools-log
+             alone is NOT sufficient to prove a claim (a claim without git
+             evidence surfaces as a SOFT conflict regardless of tools-log
+             content).
            - PRUNE resolved / obsolete entries per §9a (Smart Cleanup).
            - Target size < 20 KB. If exceeded, tighten pruning; do NOT split into per-session files.
         c) open-questions.md ← add any blockers found this session.
@@ -182,7 +203,7 @@ Step 5  Final message
 
 Both `hand-off` and `take-over` must obey (this file focuses on what `hand-off` upholds):
 
-1. **No claims without evidence.** "Completed X" is written only if `git log` or the serialized `<session-tools-log>` confirms X. Otherwise write "attempted X, unverified".
+1. **No claims without evidence.** "Completed X" is written only if `git log` or `git status --short` confirms X. The optional `<session-tools-log>` block is auxiliary evidence only — it can complement git but cannot substitute for it. Absent primary git evidence, write "attempted X, unverified".
 2. **`last_verified` timestamp is required.** If reality-check was skipped, mark it explicitly: `last_verified: SKIPPED`.
 3. **`todo` items are never dropped implicitly.** Open items on hand-off carry over verbatim; closed items are removed only if the corresponding commit / evidence is present.
 4. **Walkthrough is written last**, after all mutations are done, so it reflects the final state — not intermediate.
@@ -205,10 +226,18 @@ Every candidate entry is classified into one of four buckets:
 | **UNSURE** | Batch-ask user at end of hand-off | Anything that fails KEEP/CLEAR/STALE criteria |
 
 **Hard-evidence criteria for CLEAR** (any one suffices):
-1. Files referenced in the item have been deleted (`git log --diff-filter=D` hit).
-2. Error message referenced is absent from the last N successful runs (where `N = 5` successful test/smoke test execution runs).
-3. Corresponding entry in `open-questions.md` is marked resolved.
-4. Item body contains `Status: resolved` or a strikethrough marker.
+1. Item body contains an explicit `<!-- resolved -->` marker (or the header contains one).
+2. All file paths referenced in the item body appear in `git log --diff-filter=D --since=90.days` (files have been deleted from the repo).
+
+The following auxiliary criteria are DEFERRED to a future revision and are NOT implemented in the MVP classifier (agents that need them should manually mark entries `<!-- resolved -->`):
+- Error message referenced is absent from the last N successful test runs.
+- Corresponding entry in `open-questions.md` is marked resolved.
+
+**Rationale for MVP restraint:** free-text grep for "resolved" produced too many false positives (matching phrases like "not resolved yet"). Explicit HTML-comment markers are unambiguous, machine-checkable, and orthogonal to prose.
+
+**Two-phase execution (MVP dry-run requirement):**
+1. `hand-off` calls `reconcile.py clean-up --dry-run` first, receives a classification plan JSON, presents `unsure` items in a batched `clarify` prompt, and shows the user which entries would be removed as CLEAR / STALE.
+2. Only after user confirmation does `hand-off` call `reconcile.py clean-up --apply`. UNSURE entries are ALWAYS preserved even after apply.
 
 **User interaction rule:** UNSURE items are presented as a **single batched prompt at the end of hand-off via `clarify`**, not per-item. Example:
 
