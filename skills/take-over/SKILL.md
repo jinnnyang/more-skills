@@ -4,6 +4,13 @@ description: |
   Guides the agent through a structured session resume/take-over workflow.
   Triggers when the session starts or when the user says "continue previous work" or "接着之前的做".
   Discovers prior handoff state, performs Git reality reconciliation, and restores task checklists.
+version: 1.0.0
+author: 刘工 + Hermes Agent
+license: MIT
+metadata:
+  hermes:
+    tags: [session-handoff, workflow, take-over, context-restore]
+    related_skills: [hand-off, plan]
 ---
 
 # Session Take-Over Skill
@@ -12,7 +19,14 @@ Provides a structured session-resuming workflow to seamlessly pick up the projec
 
 ## Overview
 
-This skill implements the take-over portion of the [Session Handoff Protocol](file:///home/twait-halek/Documents/more-skills/skills/_shared/session-handoff/PROTOCOL.md). It scans for handoff files, performs reality checks against the filesystem and Git history, restores the active tasks list, and prepares the workspace for resuming work.
+This skill implements the **take-over** half of the Session Handoff Protocol. It is self-contained: everything it needs lives under this skill's directory. See `PROTOCOL.md` in this same directory for the protocol reference; see `DECISIONS.md` for the design decision log.
+
+The companion skill `hand-off` implements the closing side of the protocol. Each skill is independently installable.
+
+## Prerequisites
+
+- **`uv`** — required. This skill runs its helper Python script via `uv run --isolated python …`. Check with `command -v uv`.
+- **`git`** — required for reality-check (`git status`, `git log`).
 
 ## When to Run This Skill
 
@@ -23,13 +37,13 @@ This skill implements the take-over portion of the [Session Handoff Protocol](fi
 
 ## Take-Over Execution Workflow
 
-Follow these steps precisely:
+Follow these steps precisely. **All Python invocations use `uv run --isolated python <SKILL_DIR>/scripts/reconcile.py …`** where `<SKILL_DIR>` is the directory of this SKILL.md file.
 
 ### Step 0: Bootstrap Check
-Check if `.hermes/handoff/` exists. If the directory is missing:
+Check if `.hermes/handoff/` exists (project-scoped, in the current working directory). If the directory is missing:
 1. Run initialization:
    ```bash
-   python3 skills/_shared/session-handoff/scripts/reconcile.py init --agent "{agent_name}" --session-id "{session_id}" --writer take-over
+   uv run --isolated python <SKILL_DIR>/scripts/reconcile.py init --agent "{agent_name}" --session-id "{session_id}" --writer take-over
    ```
 2. Report: *"No previous handoff history found. Initialized empty session."*
 3. Exit take-over flow and proceed to greet the user.
@@ -45,7 +59,7 @@ git log -1 --format=%cI
 ### Step 2: Reality Check & Reconciliation
 Offload reconciliation checks to the Python helper script:
 ```bash
-python3 skills/_shared/session-handoff/scripts/reconcile.py check-reality
+uv run --isolated python <SKILL_DIR>/scripts/reconcile.py check-reality
 ```
 - Parse the output JSON which details detected discrepancies, verifying:
   - Git status uncommitted modifications vs. walkthrough notes.
@@ -88,3 +102,12 @@ Now/Next: ...
 Blocked on: ...
 ```
 Ask the user where they would like to resume or what task to focus on first.
+
+---
+
+## Companion & References
+
+- Companion skill (closing side): `hand-off` — each is independently installable; they share protocol semantics but not files.
+- `PROTOCOL.md` (this directory) — protocol reference from the take-over perspective.
+- `DECISIONS.md` (this directory) — design decision log (take-over relevant subset).
+- `templates/` (this directory) — default handoff document templates, seeded by `scripts/reconcile.py init`.
