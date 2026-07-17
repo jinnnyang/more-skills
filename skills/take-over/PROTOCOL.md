@@ -54,7 +54,7 @@ Four **core** documents (always considered), two **optional** (only when produce
 | `context.md` | *What must never break* — invariants, env, credentials location, "don't touch X because Y" | **Strictly Additive-only** (grows monotonically; corrections appended at the bottom with dated entries) | Small (< 2 KB target) |
 | `task.md` | *What's happening now + next up* — persisted `todo` state | Overwritten each hand-off | Small |
 | `walkthrough.md` | *What happened, why, and any surprises* — living work-memory, pruned when items resolve | **Editable** (add on hand-off, prune resolved items) | Bounded (target < 20 KB) |
-| `open-questions.md` | *What's blocked pending human input* — **only** items requiring a **human** answer. Agent-side blockers (waiting on API/build/tool) stay in `task.md` with `[!]` marker. | Overwritten; entries removed when resolved | Small |
+| `questions.md` | *What's blocked pending human input* — **only** items requiring a **human** answer. Agent-side blockers (waiting on API/build/tool) stay in `task.md` with `[!]` marker. | Overwritten; entries removed when resolved | Small |
 
 ### 4.2 Optional (create only when relevant)
 
@@ -63,30 +63,44 @@ Four **core** documents (always considered), two **optional** (only when produce
 | `plan.md` | *Future intent* — the next-phase roadmap, self-contained | Overwritten |
 | `review.md` | *Known bugs / TODOs in the code itself* | Entries removed when fixed |
 
-**Discipline for take-over:** `L1 (always load) = context.md + task.md + open-questions.md`. Optional files load only on demand. `walkthrough.md` is L3 — reference only, never auto-loaded.
+**Discipline for take-over:** `L1 (always load) = context.md + task.md + questions.md`. Optional files load only on demand. `walkthrough.md` is L3 — reference only, never auto-loaded.
 
 ## 5. Directory Layout
 
-Dual-track (project-scoped, in the current working directory):
+**Flat file layout, no `HANDOFF-` prefix, no `.hermes/handoff/` subdirectory.** Docs live directly in the working scope directory that take-over resumes from:
 
 ```
-.hermes/handoff/                    # Private scratch, .gitignore'd — take-over reads here by default
-    context.md
-    task.md
-    walkthrough.md
-    open-questions.md
-    plan.md                         # optional
-    review.md                       # optional
-
-docs/handoff/                       # Public, git-tracked snapshot — take-over reads here if present
-    (copy of the above, produced by hand-off's explicit "promote" action)
+<scope>/
+    context.md                       # L1 load
+    task.md                          # L1 load
+    walkthrough.md                   # L3 (do NOT auto-load)
+    questions.md                     # L1 load — includes ## Open + ## Closed
+    plan.md                          # L2 load on demand
+    review.md                        # L2 load on demand
 ```
 
-**Precedence rule:** if both `.hermes/handoff/` and `docs/handoff/` exist, `.hermes/handoff/` wins (it's the live working set). `docs/handoff/` is a frozen historical snapshot; do NOT modify its contents.
+**Kind-based scope detection.** A directory qualifies as a scope only when at least one candidate file carries YAML frontmatter with a recognised `kind` value (`context` / `task` / `walkthrough` / `questions` / `plan` / `review`). Prevents take-over from proposing bogus resume targets against arbitrary `context.md` / `task.md` files.
+
+## 5a. Scope Resolution
+
+Scope is defined by **the task's range**, not by directory role. Take-over must not assume a canonical location. Discovery workflow:
+
+1. Run `reconcile.py list-scopes` to enumerate all live scopes under pwd (see §7 Step 0).
+2. If zero → offer to `init` a new scope (`clarify`).
+3. If one → use it silently.
+4. If multiple → present the list to the user via `clarify`; the chosen path is passed as `--scope <path>` to every subsequent command.
+
+Resolution rules for every command taking `--scope`:
+
+1. **Explicit** — `--scope <path>` wins verbatim.
+2. **Implicit at pwd** — if pwd has recognised handoff docs, use pwd silently.
+3. **Ambiguous** — otherwise script emits `WARNING`, prints `ambiguous_scope` JSON, exits code 3. Take-over MUST `clarify` before proceeding.
+
+Batch commands (`validate`, `check-reality`, `clean-up`) accept `--all-scopes` for repository-wide inspection.
 
 ### Multi-branch caveat (deferred)
 
-Git worktree / branch-parallel work is a real problem but out of scope for MVP. If it becomes an issue, prefix with branch: `.hermes/handoff/<branch>/…`. Ignore for now.
+Git worktree / branch-parallel work is out of scope for MVP. If it becomes an issue, prefix with branch under a per-branch scope. Ignore for now.
 
 ## 6. Document Format
 
@@ -94,7 +108,7 @@ Git worktree / branch-parallel work is a real problem but out of scope for MVP. 
 
 ```yaml
 ---
-kind: context | task | walkthrough | open-questions | plan | review   # MUST be one of these exact values
+kind: context | task | walkthrough | questions | plan | review   # MUST be one of these exact values
 version: 1
 last_updated: 2026-07-17T14:20:00+08:00     # MUST include timezone offset (avoid Windows/Unix parse drift)
 last_verified: 2026-07-17T14:20:00+08:00    # when reality-check last ran; use `SKIPPED` if skipped
@@ -121,12 +135,12 @@ All Python invocations use `uv run --isolated python <SKILL_DIR>/scripts/reconci
 
 ```
 Step 0  Bootstrap Check & Initial Loading
-        - If `.hermes/handoff/` is missing, initialize the directory.
+        - If `<scope>/` is missing, initialize the directory.
         - Create empty default files using templates from this skill's templates/ directory.
         - Report: "No previous handoff history found. Initialized empty session." and exit take-over flow.
 
 Step 1  Discover
-        - Scan .hermes/handoff/ (and docs/handoff/ if present) for the document set.
+        - Scan <scope>/ (and docs/handoff/ if present) for the document set.
         - Read only YAML frontmatter of every file first.
         - Determine freshness: last_updated vs `git log -1 --format=%cI`.
 
@@ -140,12 +154,12 @@ Step 2  Reality check (reconciliation)     ← Offloaded to reconcile.py
           * Sanity-existence of key files mentioned in task.md.
           * Frontmatter validity (kind enum + timestamp sanity).
           * `--apply-soft-conflicts` auto-appends SOFT conflicts to
-            `open-questions.md` under `## Soft Conflicts (Reconciled)`, so
+            `questions.md` under `## Soft Conflicts (Reconciled)`, so
             the take-over agent never rewrites that section itself.
           * Optional: run declared smoke test if fast (< 10s) and specified as REQUIRED in task.md.
 
 Step 3  Layered load
-        L1 (always):  context.md + task.md + open-questions.md
+        L1 (always):  context.md + task.md + questions.md
         L2 (on demand): plan.md, review.md, current-phase excerpt of plan.md
         L3 (reference only, do NOT auto-load): walkthrough.md
                        Read the single walkthrough.md only when digging
@@ -161,14 +175,14 @@ Step 5  Conflict handling
           HARD → halt, `clarify` prompt with structured choices, block loading.
                  If running in non-interactive/CI mode, HALT times out after 5 minutes,
                  writes `conflict_pending.json` with details, and aborts execution.
-          SOFT → append to `open-questions.md` under a structured `## Soft Conflicts` section with UTC timestamp. Continue L1 load.
+          SOFT → append to `questions.md` under a structured `## Soft Conflicts` section with UTC timestamp. Continue L1 load.
           AMBIGUOUS → escalate to HARD (fail-safe).
 
 Step 6  plan-mode coexistence check (Pre-empt final report)
         If `.hermes/plans/` exists (plan-mode artifacts), do NOT auto-merge.
         Prompt user via `clarify` with:
           - Ignore (default) — keep both directories independent
-          - Import plan-mode's plan.md → .hermes/handoff/plan.md (copy, one-shot)
+          - Import plan-mode's plan.md → <scope>/plan.md (copy, one-shot)
           - Show diff first
         Never modify `.hermes/plans/` from this skill. Adjust task state before reporting if imported.
 
@@ -188,9 +202,9 @@ Both `hand-off` and `take-over` must obey (this file focuses on what `take-over`
 2. **`last_verified` timestamp is required.** If reality-check was skipped for any reason, surface `last_verified: SKIPPED` in the take-over summary.
 3. **`todo` items are never inferred.** Restore verbatim from `task.md`; do not fabricate items or drop unrecognized entries.
 4. **Reality trumps documentation on hard conflicts.** See §9b — HARD conflicts halt loading until the user resolves them.
-5. **Atomic Write Rule.** Any write take-over performs (e.g. logging SOFT conflicts to `open-questions.md`, initializing empty files) must write to a `.tmp` file and rename (POSIX `rename()`) to replace the target.
+5. **Atomic Write Rule.** Any write take-over performs (e.g. logging SOFT conflicts to `questions.md`, initializing empty files) must write to a `.tmp` file and rename (POSIX `rename()`) to replace the target.
 6. **Script-assisted Execution.** Reality-check and conflict classification are offloaded to this skill's `scripts/reconcile.py` rather than done purely in LLM memory.
-7. **On take-over conflict, apply §9b tiered handling.** Hard conflicts halt via `clarify`; soft conflicts are logged to `open-questions.md` under a structured `## Soft Conflicts` section with UTC timestamp, and loading continues. Never silently reconcile away a hard conflict.
+7. **On take-over conflict, apply §9b tiered handling.** Hard conflicts halt via `clarify`; soft conflicts are logged to `questions.md` under a structured `## Soft Conflicts` section with UTC timestamp, and loading continues. Never silently reconcile away a hard conflict.
 
 ## 9b. Take-Over Conflict Handling (tiered)
 
@@ -199,10 +213,19 @@ Confidence-based classification. Every reality-check discrepancy falls into one 
 | Tier | Trigger | Action |
 |---|---|---|
 | **HARD** | Document claims "completed X" but no git/code evidence for X. Two handoff docs contradict each other. `context.md` invariant directly contradicts current code/config. | **HALT.** Present conflicts via `clarify` (structured choices): "trust doc / trust reality / user explains". Loading blocks until resolved. |
-| **SOFT** | `last_verified` older than 7 days. Referenced file was renamed/moved but content intact. `session_id` not found in `session_search` (likely pruned). Tools-log entry lacks git evidence. | Auto-logged to `open-questions.md` with `⚠️ stale` tag under `## Soft Conflicts (Reconciled)` with UTC timestamp by `reconcile.py check-reality --apply-soft-conflicts`. Continue L1 load. Report count in take-over summary. |
+| **SOFT** | `last_verified` older than 7 days. Referenced file was renamed/moved but content intact. `session_id` not found in `session_search` (likely pruned). Tools-log entry lacks git evidence. | Auto-logged into `questions.md` under `## Open` as `### Soft conflict · <type> · <timestamp>` entries by `reconcile.py check-reality --apply-soft-conflicts`. Continue L1 load. Report count in take-over summary. |
 | **AMBIGUOUS** | Fails both categorization tests. | Escalate to HARD (fail-safe). |
 
 **Reporting:** take-over's final summary MUST state "N soft conflicts logged, M hard conflicts resolved" so the user always sees the reconciliation footprint.
+
+## 9c. Question Archive Semantics (v0.5-rev-C)
+
+`questions.md` uses a two-section structure — `## Open` (active) and `## Closed` (permanent archive). Entries are `###`-level.
+
+- Take-over L1 loads the whole file so both current questions AND historical decisions are in context on resume.
+- When take-over addresses a `## Open` entry, it should mark that entry with `<!-- resolved -->` (via `write-atomic`) rather than deleting it. The next `hand-off clean-up --apply` archives it to `## Closed`.
+- SOFT conflicts logged by `check-reality --apply-soft-conflicts` land under `## Open` as `### Soft conflict · <type> · <timestamp>` — the same lifecycle applies (mark `<!-- resolved -->` once addressed).
+- **Do not manually rewrite `## Closed` entries.** It is a permanent record; only the hand-off classifier writes to it.
 
 ## 10. Decision Points relevant to take-over
 
@@ -227,7 +250,7 @@ Rationale: structured choices render as pickable UI, avoid ambiguity from typed 
 
 Ship the minimum that closes the loop:
 
-- **Documents read:** `context.md`, `task.md`, `walkthrough.md` (L3 on-demand only), `open-questions.md`. Optional: `plan.md`, `review.md`.
+- **Documents read:** `context.md`, `task.md`, `walkthrough.md` (L3 on-demand only), `questions.md`. Optional: `plan.md`, `review.md`.
 - **Reality check:** `git status` + `git log -5` + `<session-tools-log>` check + file-existence sanity. Skip smoke tests for MVP unless marked REQUIRED in task.md.
 - **Layered load:** L1 mandatory, L2 on demand, L3 via `session_search`.
 - **No branch-prefix** — single-branch assumption.
@@ -249,7 +272,7 @@ skills/take-over/
     context.md
     task.md
     walkthrough.md
-    open-questions.md
+    questions.md
 ```
 
 The companion skill `hand-off` maintains an **independent** copy of the protocol from the closing side. The two skills do NOT share files at runtime; users can install either or both. See `DECISIONS.md` (this directory) for the rationale behind this self-contained layout.
@@ -257,10 +280,10 @@ The companion skill `hand-off` maintains an **independent** copy of the protocol
 ## 13. Open Questions (Not Yet Decision Points)
 
 - How does this interact with `subagent-driven-development`? Sub-agents don't currently write handoff docs — should orchestrators propagate context to them?
-- Concurrent take-over from two live sessions reading from the same `.hermes/handoff/` — MVP assumes serial execution; needs a lock/leader-election mechanism in v2.
-- Multi-branch layout — prefix with branch (`.hermes/handoff/<branch>/…`); deferred (see §5 caveat). Reintroduces `branch:` frontmatter field.
+- Concurrent take-over from two live sessions reading from the same `<scope>/` — MVP assumes serial execution; needs a lock/leader-election mechanism in v2.
+- Multi-branch layout — prefix with branch (`<scope>/<branch>/…`); deferred (see §5 caveat). Reintroduces `branch:` frontmatter field.
 - `next_agent` claim protocol — currently no way to signal "I'm about to pick this up"; if collaborative workflows appear, add a claim step.
-- Dry-run mode for `take-over` — describe what would be loaded and what conflicts would be raised without mutating `open-questions.md`.
+- Dry-run mode for `take-over` — describe what would be loaded and what conflicts would be raised without mutating `questions.md`.
 - Drift-detection tooling between the two self-contained skills — currently manual (see `DECISIONS.md` 2026-07-17 · adoption of 方案 A).
 
 ## 14. References

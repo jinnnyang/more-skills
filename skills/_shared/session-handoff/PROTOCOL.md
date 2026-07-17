@@ -55,7 +55,7 @@ Four **core** documents (always considered), two **optional** (only when produce
 | `context.md` | *What must never break* — invariants, env, credentials location, "don't touch X because Y" | **Strictly Additive-only** (grows monotonically; corrections appended at the bottom with dated entries) | Small (< 2 KB target) |
 | `task.md` | *What's happening now + next up* — persisted `todo` state | Overwritten each hand-off | Small |
 | `walkthrough.md` | *What happened, why, and any surprises* — living work-memory, pruned when items resolve | **Editable** (add on hand-off, prune resolved items) | Bounded (target < 20 KB) |
-| `open-questions.md` | *What's blocked pending human input* — **only** items requiring a **human** answer. Agent-side blockers (waiting on API/build/tool) stay in `task.md` with `[!]` marker. | Overwritten; entries removed when resolved | Small |
+| `questions.md` | *What's blocked pending human input* — **only** items requiring a **human** answer. Agent-side blockers (waiting on API/build/tool) stay in `task.md` with `[!]` marker. | Overwritten; entries removed when resolved | Small |
 
 ### 4.2 Optional (create only when relevant)
 
@@ -71,11 +71,11 @@ Four **core** documents (always considered), two **optional** (only when produce
 Dual-track:
 
 ```
-.hermes/handoff/                    # Private scratch, .gitignore'd
+<scope>/                    # Private scratch, .gitignore'd
     context.md
     task.md
     walkthrough.md                  # single living file, pruned on hand-off (see §9a)
-    open-questions.md
+    questions.md
     plan.md                         # optional
     review.md                       # optional
 
@@ -85,11 +85,11 @@ docs/handoff/                       # Public, git-tracked snapshot — only when
 
 **Why single `walkthrough.md` (not `walkthrough/*.md`):** per DECISIONS ②, walkthrough is *working memory*, not audit log. A single file makes L3 load cost bounded by pruning discipline (§9a) — long-term audit trail already lives in `git log` and `session_search`. Per-session files created a pruning + indexing problem and were explicitly rejected.
 
-**Rule:** `hand-off` writes to `.hermes/handoff/` by default. Promoting to `docs/handoff/` is an explicit user choice ("这批留档" / "commit into repo").
+**Rule:** `hand-off` writes to `<scope>/` by default. Promoting to `docs/handoff/` is an explicit user choice ("这批留档" / "commit into repo").
 
 ### Multi-branch caveat (deferred)
 
-Git worktree / branch-parallel work is a real problem but out of scope for MVP. If it becomes an issue, prefix with branch: `.hermes/handoff/<branch>/…`. Ignore for now.
+Git worktree / branch-parallel work is a real problem but out of scope for MVP. If it becomes an issue, prefix with branch: `<scope>/<branch>/…`. Ignore for now.
 
 ## 6. Document Format
 
@@ -97,7 +97,7 @@ Git worktree / branch-parallel work is a real problem but out of scope for MVP. 
 
 ```yaml
 ---
-kind: context | task | walkthrough | open-questions | plan | review   # MUST be one of these exact values
+kind: context | task | walkthrough | questions | plan | review   # MUST be one of these exact values
 version: 1
 last_updated: 2026-07-16T14:20:00+08:00     # MUST include timezone offset (avoid Windows/Unix parse drift)
 last_verified: 2026-07-16T14:20:00+08:00    # when reality-check last ran; use `SKIPPED` if skipped
@@ -122,12 +122,12 @@ Triggered by: loading the skill; user says "continue previous work" / "接着之
 
 ```
 Step 0  Bootstrap Check & Initial Loading
-        - If `.hermes/handoff/` is missing, initialize the directory.
+        - If `<scope>/` is missing, initialize the directory.
         - Create empty default files using templates from `_shared/session-handoff/templates/`.
         - Report: "No previous handoff history found. Initialized empty session." and exit take-over flow.
 
 Step 1  Discover
-        - Scan .hermes/handoff/ (and docs/handoff/ if present) for the document set.
+        - Scan <scope>/ (and docs/handoff/ if present) for the document set.
         - Read only YAML frontmatter of every file first.
         - Determine freshness: last_updated vs `git log -1 --format=%cI`.
 
@@ -140,7 +140,7 @@ Step 2  Reality check (reconciliation)     ← Offloaded to python script helper
           * Optional: run declared smoke test if fast (< 10s) and specified as REQUIRED in task.md.
 
 Step 3  Layered load
-        L1 (always):  context.md + task.md + open-questions.md
+        L1 (always):  context.md + task.md + questions.md
         L2 (on demand): plan.md, review.md, current-phase excerpt of plan.md
         L3 (reference only, do NOT auto-load): walkthrough.md
                        Read the single walkthrough.md only when digging
@@ -156,14 +156,14 @@ Step 5  Conflict handling
           HARD → halt, `clarify` prompt with structured choices, block loading.
                  If running in non-interactive/CI mode, HALT times out after 5 minutes, 
                  writes `conflict_pending.json` with details, and aborts execution.
-          SOFT → append to `open-questions.md` under a structured `## Soft Conflicts` section with UTC timestamp. Continue L1 load.
+          SOFT → append to `questions.md` under a structured `## Soft Conflicts` section with UTC timestamp. Continue L1 load.
           AMBIGUOUS → escalate to HARD (fail-safe).
 
 Step 6  plan-mode coexistence check (Pre-empt final report)
         If `.hermes/plans/` exists (plan-mode artifacts), do NOT auto-merge.
         Prompt user via `clarify` with:
           - Ignore (default) — keep both directories independent
-          - Import plan-mode's plan.md → .hermes/handoff/plan.md (copy, one-shot)
+          - Import plan-mode's plan.md → <scope>/plan.md (copy, one-shot)
           - Show diff first
         Never modify `.hermes/plans/` from this skill. Adjust task state before reporting if imported.
 
@@ -181,7 +181,7 @@ Triggered by: user says "先到这" / "换你上" / `/handoff`; auto-suggested w
 
 ```
 Step 0  Bootstrap Check
-        - If `.hermes/handoff/` is missing, initialize the directory structure first.
+        - If `<scope>/` is missing, initialize the directory structure first.
 
 Step 1  Reality check (anti-hallucination)
         - Offload to `reconcile.py check-history` to compute actual mutations:
@@ -201,7 +201,7 @@ Step 2  Update core docs (Atomic Write Rule: write to `.tmp` first, then rename)
                * `<session-tools-log>` metadata: Serialize the list of actual tool calls of this session (tool name, timestamp, simplified input/output metadata).
            - PRUNE resolved / obsolete entries per §9a (Smart Cleanup).
            - Target size < 20 KB. If exceeded, tighten pruning; do NOT split into per-session files.
-        c) open-questions.md ← add any blockers found this session.
+        c) questions.md ← add any blockers found this session.
         d) context.md   ← only if a new invariant was learned. Additive-only; append new invariants to the bottom.
         e) plan.md / review.md ← only if produced/updated this session.
 
@@ -212,17 +212,17 @@ Step 3  Update frontmatter
         - Set status appropriately (in-progress / blocked / phase-complete).
 
 Step 4  Promote decision (optional; default = private)
-        `.hermes/handoff/` is gitignored, so no commit action for private scratch.
+        `<scope>/` is gitignored, so no commit action for private scratch.
         Ask via AskUserQuestion (clarify) with structured choices:
           "How to handle this handoff?"
-            - Leave in .hermes/handoff/ (private, no commit)
+            - Leave in <scope>/ (private, no commit)
             - Promote to docs/handoff/ and commit now
             - Promote to docs/handoff/, stage but don't commit
         Default: Leave private.
 
         **Promote semantics = COPY snapshot, not move.**
         - All file copies to `docs/handoff/` must follow the Atomic Write Rule.
-        - `.hermes/handoff/` remains the live working set and keeps evolving.
+        - `<scope>/` remains the live working set and keeps evolving.
         - `docs/handoff/` receives a copy with `frozen: true` added to each
           file's frontmatter. Skills MUST NOT re-touch frozen files on
           subsequent runs; they are a historical snapshot for humans / PR review.
@@ -246,11 +246,11 @@ Both skills must obey:
 4. **Walkthrough is written last**, after all mutations are done, so it reflects the final state — not intermediate.
 5. **Atomic Write Rule.** Every file mutation must write to a `.tmp` file and rename (POSIX `rename()`) to replace the target file.
 6. **Script-assisted Execution.** Major verification, cleanup classification, and conflict calculations must be offloaded to `skills/_shared/session-handoff/scripts/reconcile.py` rather than done purely in LLM memory.
-7. **On take-over conflict, apply §9b tiered handling.** Hard conflicts halt via `clarify`; soft conflicts are logged to `open-questions.md` under a structured `## Soft Conflicts` section with UTC timestamp, and loading continues. Never silently reconcile away a hard conflict.
+7. **On take-over conflict, apply §9b tiered handling.** Hard conflicts halt via `clarify`; soft conflicts are logged to `questions.md` under a structured `## Soft Conflicts` section with UTC timestamp, and loading continues. Never silently reconcile away a hard conflict.
 
 ## 9a. Smart Cleanup (confidence-based auto-approval)
 
-Modeled on Hermes' "Smart" dangerous-command mode: hand-off must compress living documents (`walkthrough.md`, `open-questions.md`, `review.md`) but must not delete anything it isn't sure about. 
+Modeled on Hermes' "Smart" dangerous-command mode: hand-off must compress living documents (`walkthrough.md`, `questions.md`, `review.md`) but must not delete anything it isn't sure about. 
 
 **Decision Priority:** `KEEP > CLEAR > STALE > UNSURE` (retaining tags takes precedence over deleting tags).
 
@@ -266,7 +266,7 @@ Every candidate entry is classified into one of four buckets:
 **Hard-evidence criteria for CLEAR** (any one suffices):
 1. Files referenced in the item have been deleted (`git log --diff-filter=D` hit).
 2. Error message referenced is absent from the last N successful runs (where `N = 5` successful test/smoke test execution runs).
-3. Corresponding entry in `open-questions.md` is marked resolved.
+3. Corresponding entry in `questions.md` is marked resolved.
 4. Item body contains `Status: resolved` or a strikethrough marker.
 
 **User interaction rule:** UNSURE items are presented as a **single batched prompt at the end of hand-off via `clarify`**, not per-item. Example:
@@ -287,7 +287,7 @@ Mirrors the confidence-based philosophy of §9a. Every reality-check discrepancy
 | Tier | Trigger | Action |
 |---|---|---|
 | **HARD** | Document claims "completed X" but no git/code evidence for X. Two handoff docs contradict each other. `context.md` invariant directly contradicts current code/config. | **HALT.** Present conflicts via `clarify` (structured choices): "trust doc / trust reality / user explains". Loading blocks until resolved. |
-| **SOFT** | `last_verified` older than 7 days. Referenced file was renamed/moved but content intact. `session_id` not found in `session_search` (likely pruned). | Log to `open-questions.md` with `⚠️ stale` tag. Continue L1 load. Report count in take-over summary. |
+| **SOFT** | `last_verified` older than 7 days. Referenced file was renamed/moved but content intact. `session_id` not found in `session_search` (likely pruned). | Log to `questions.md` with `⚠️ stale` tag. Continue L1 load. Report count in take-over summary. |
 | **AMBIGUOUS** | Fails both categorization tests. | Escalate to HARD (fail-safe). |
 
 Reporting: take-over's final summary must state "N soft conflicts logged, M hard conflicts resolved" so the user always sees the reconciliation footprint.
@@ -298,8 +298,8 @@ Reporting: take-over's final summary must state "N soft conflicts logged, M hard
 |---|---|---|---|
 | ① | Document format: YAML frontmatter + MD, or plain MD? | **✅ DECIDED: YAML frontmatter + MD** | Machine-scannable frontmatter enables cheap L1 pre-filter. |
 | ② | `walkthrough` growth control? | **✅ DECIDED: single `walkthrough.md`, prune resolved items** | Living work-memory, not audit log. Resolved-issue entries are compressed/removed on hand-off. Long-term audit trail lives in git history + `session_search`, not here. |
-| ③ | Git commit on hand-off (promote path only)? | **✅ DECIDED: ask via `AskUserQuestion` (`clarify`), then commit** | Private `.hermes/handoff/` is gitignored so N/A. Promote → `docs/handoff/` always prompts via the structured question tool with a default commit message; user can approve, edit, or skip. |
-| ④ | On take-over conflict (docs disagree with git/code): halt vs auto-log to `open-questions.md`? | **✅ DECIDED: tiered — hard conflicts halt via `clarify`, soft conflicts logged with `⚠️ stale`, ambiguous → escalate to hard (fail-safe). See §9b.** | Consistent with §9a Smart Cleanup philosophy: confidence-based auto-approval; user only interrupted for the highest-signal cases. |
+| ③ | Git commit on hand-off (promote path only)? | **✅ DECIDED: ask via `AskUserQuestion` (`clarify`), then commit** | Private `<scope>/` is gitignored so N/A. Promote → `docs/handoff/` always prompts via the structured question tool with a default commit message; user can approve, edit, or skip. |
+| ④ | On take-over conflict (docs disagree with git/code): halt vs auto-log to `questions.md`? | **✅ DECIDED: tiered — hard conflicts halt via `clarify`, soft conflicts logged with `⚠️ stale`, ambiguous → escalate to hard (fail-safe). See §9b.** | Consistent with §9a Smart Cleanup philosophy: confidence-based auto-approval; user only interrupted for the highest-signal cases. |
 
 ## 10a. User Interaction Rule
 
@@ -316,7 +316,7 @@ Rationale: structured choices render as pickable UI, avoid ambiguity from typed 
 
 Ship the minimum that closes the loop:
 
-- **Documents:** `context.md`, `task.md`, `walkthrough.md`, `open-questions.md` only. Skip `plan.md` and `review.md` for MVP — they're optional anyway.
+- **Documents:** `context.md`, `task.md`, `walkthrough.md`, `questions.md` only. Skip `plan.md` and `review.md` for MVP — they're optional anyway.
 - **Reality check:** `git status` + `git log -5` + `todo` diff + `<session-tools-log>` check. Skip smoke tests for MVP unless marked REQUIRED in task.md.
 - **Layered load:** L1 mandatory, L2 on demand, L3 via `session_search`.
 - **No auto-promotion** to `docs/handoff/` — always private scratch by default.
@@ -339,7 +339,7 @@ skills/
   _shared/session-handoff/
     PROTOCOL.md           ← THIS FILE
     DECISIONS.md          (append-only log resolving ①②③④ and later choices)
-    templates/            (context.md, task.md, walkthrough.md, open-questions.md — used by both skills)
+    templates/            (context.md, task.md, walkthrough.md, questions.md — used by both skills)
     scripts/
       reconcile.py        (Helper script for validation, reality checking, smart cleanup, and conflict handling)
 ```
@@ -350,8 +350,8 @@ Rationale: both skills are peers (neither is subordinate); protocol and template
 
 - How does this interact with `subagent-driven-development`? Sub-agents don't currently write handoff docs — should orchestrators propagate context to them?
 - Any hook for auto-suggesting `hand-off` when context window > 75%? (Runtime-dependent; may not be portable.)
-- Concurrent hand-off from two live sessions writing to the same `.hermes/handoff/` — MVP assumes serial execution; needs a lock file or timestamp-based conflict prompt in v2.
-- Multi-branch layout — prefix with branch (`.hermes/handoff/<branch>/…`); deferred (see §5 caveat). Reintroduces `branch:` frontmatter field.
+- Concurrent hand-off from two live sessions writing to the same `<scope>/` — MVP assumes serial execution; needs a lock file or timestamp-based conflict prompt in v2.
+- Multi-branch layout — prefix with branch (`<scope>/<branch>/…`); deferred (see §5 caveat). Reintroduces `branch:` frontmatter field.
 - `next_agent` claim protocol — currently no way to signal "I'm about to pick this up"; if collaborative workflows appear, add a claim step.
 - Dry-run mode for `hand-off` — print diff of every file it would write, confirm via `clarify` before landing. Useful especially for first Smart Cleanup run on a project.
 

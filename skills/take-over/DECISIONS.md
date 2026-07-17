@@ -16,7 +16,7 @@
 ### ④ Take-over conflict handling (take-over specific)
 **Decision:** Tiered per §9b of PROTOCOL.md.
 - **HARD** (doc claims contradicted by code/git, cross-doc contradictions, invariant violations) → HALT via `clarify`.
-- **SOFT** (stale `last_verified`, renamed files, pruned session_id) → log to `open-questions.md` with `⚠️ stale` under `## Soft Conflicts (Reconciled)` section, continue.
+- **SOFT** (stale `last_verified`, renamed files, pruned session_id) → log to `questions.md` with `⚠️ stale` under `## Soft Conflicts (Reconciled)` section, continue.
 - **AMBIGUOUS** → escalate to HARD (fail-safe).
 **Rationale:** Consistent with hand-off's Smart Cleanup philosophy (§9a in hand-off's PROTOCOL). User only interrupted for highest-signal conflicts.
 **Rejected:**
@@ -48,9 +48,9 @@ Deferred to §13: `project` (implied by cwd), `branch` (needs v2 branch-prefix l
 `last_updated` / `last_verified` **must** include ISO-8601 timezone offset to avoid Windows/Unix parse drift.
 **Rationale:** every frontmatter field is a chance for an agent to hallucinate a value. Fewer fields = fewer failure modes. Fields can be reintroduced when a reader exists.
 
-### R3 · `open-questions.md` vs `task.md` boundary (§4.1) (cross-cutting)
-**Decision:** `open-questions.md` is exclusively for items requiring a **human** answer. Agent-side blockers (waiting on API, build, tool availability) stay in `task.md` with a `[!]` marker.
-**Rationale:** the two were previously ambiguous. take-over's SOFT-conflict logging must land in the correct file — human questions and stale reconciliations go into `open-questions.md`; automated retry blockers go into `task.md`.
+### R3 · `questions.md` vs `task.md` boundary (§4.1) (cross-cutting)
+**Decision:** `questions.md` is exclusively for items requiring a **human** answer. Agent-side blockers (waiting on API, build, tool availability) stay in `task.md` with a `[!]` marker.
+**Rationale:** the two were previously ambiguous. take-over's SOFT-conflict logging must land in the correct file — human questions and stale reconciliations go into `questions.md`; automated retry blockers go into `task.md`.
 
 ### R5 · plan-mode coexistence check (§7 Step 6) (take-over specific)
 **Decision:** On take-over, if `.hermes/plans/` exists, report its presence in the summary but **do not auto-merge**. On explicit user request via `clarify`, offer Ignore / Import plan.md / Show diff. Never write to `.hermes/plans/`.
@@ -71,11 +71,11 @@ Following the comprehensive review of PROTOCOL v0.2.
 **Rationale:** Operating at high context usage (>75%) significantly degrades LLM reasoning capabilities. Offloading deterministic logic to Python ensures reliability and keeps the AI cognitive load minimal.
 
 ### ③ Atomic Write Protection (cross-cutting)
-**Decision:** All writes to `.hermes/handoff/` and `docs/handoff/` must be atomic: write to a `.tmp` file and rename (POSIX `rename()`) to overwrite the target. take-over writes to `.hermes/handoff/` only when logging SOFT conflicts or initializing empty files.
+**Decision:** All writes to `<scope>/` and `docs/handoff/` must be atomic: write to a `.tmp` file and rename (POSIX `rename()`) to overwrite the target. take-over writes to `<scope>/` only when logging SOFT conflicts or initializing empty files.
 **Rationale:** Prevents torn writes/corrupted files if the agent is interrupted or crashes midway through take-over.
 
 ### ④ Cold-Start (Bootstrap) and Empty State Handling (cross-cutting)
-**Decision:** If `.hermes/handoff/` does not exist during `take-over`, it is automatically initialized. `take-over` will report: "No previous handoff history found. Initialized empty session." and populate default files from this skill's `templates/` directory.
+**Decision:** If `<scope>/` does not exist during `take-over`, it is automatically initialized. `take-over` will report: "No previous handoff history found. Initialized empty session." and populate default files from this skill's `templates/` directory.
 **Rationale:** Resolves the first-time-use (FTU) user experience gap.
 
 ### ⑤ Pre-empt Plan-Mode Merge Check (take-over specific)
@@ -83,7 +83,7 @@ Following the comprehensive review of PROTOCOL v0.2.
 **Rationale:** If `plan-mode` files are imported, the report must reflect the imported tasks; otherwise, the summary shown to the user becomes immediately stale.
 
 ### ⑥ Unified Frontmatter Kind Enum & Context Append-Only (cross-cutting)
-**Decision:** Frontmatter `kind` is strictly restricted to the enum values: `context`, `task`, `walkthrough`, `open-questions`, `plan`, `review`. `context.md` is strictly additive; take-over must not rewrite past entries.
+**Decision:** Frontmatter `kind` is strictly restricted to the enum values: `context`, `task`, `walkthrough`, `questions`, `plan`, `review`. `context.md` is strictly additive; take-over must not rewrite past entries.
 **Rationale:** Eliminates parser ambiguity and maintains a clean audit trail.
 
 ---
@@ -138,14 +138,14 @@ Second round of design-doc-review findings, focused on the scripts and take-over
 ### R10 · Explicit lifecycle markers replace free-text grep (referenced by take-over via mirrored templates)
 **Decision:** Smart Cleanup CLEAR/KEEP classification uses `<!-- keep -->` / `<!-- resolved -->` HTML markers, not free-text `"resolved"` grep.
 **Rationale:** free-text matched sentences like "not resolved yet" and deleted live entries.
-**Impact on take-over:** open-questions.md sections created by `take-over` (SOFT conflicts) will be preserved automatically because the `## Soft Conflicts (Reconciled)` heading is exempted from cleanup and its entries are dated but not marked resolved.
+**Impact on take-over:** questions.md sections created by `take-over` (SOFT conflicts) will be preserved automatically because the `## Soft Conflicts (Reconciled)` heading is exempted from cleanup and its entries are dated but not marked resolved.
 
 ### R11 · Two-phase Smart Cleanup (dry-run → apply) (hand-off specific, mirrored for awareness)
 **Decision:** `clean-up` requires `--dry-run` or `--apply`; dry-run first, then apply after user confirmation.
 **Rationale:** consistent with §9a "err toward UNSURE"; the previous one-shot mode landed deletions before the user saw the plan.
 
 ### R12 · SOFT conflict logging by script, not agent (take-over specific)
-**Decision:** `check-reality --apply-soft-conflicts` writes SOFT conflicts directly into `open-questions.md` under `## Soft Conflicts (Reconciled)` with UTC timestamp and `⚠️` marker. `take-over` Step 2 uses this flag; Step 5 no longer constructs the section itself.
+**Decision:** `check-reality --apply-soft-conflicts` writes SOFT conflicts directly into `questions.md` under `## Soft Conflicts (Reconciled)` with UTC timestamp and `⚠️` marker. `take-over` Step 2 uses this flag; Step 5 no longer constructs the section itself.
 **Rationale:** consistent with v0.3 ① (script-assisted execution). Removes another surface where the agent could hallucinate the section shape or drift from the format take-over's next run expects.
 
 ### R13 · Serializer double-newline fix (cross-cutting)
@@ -168,3 +168,33 @@ Second round of design-doc-review findings, focused on the scripts and take-over
 **Decision:** SKILL.md Step 4 (Restore Checklist) is re-run at the end of Step 6 (Plan-Mode Coexistence) if the user chose "Import plan.md". The final Step 7 summary reflects the reconciled task list.
 **Rationale:** DECISIONS 2026-07-16 v0.3 ⑤ ("Pre-empt Plan-Mode Merge Check") intended the report to be up-to-date, but Step 4's original position (before Step 6) meant an imported plan.md's tasks never made it into `todo`.
 
+
+## Rev-C (v0.5-rev-C · 2026-07-17) — Flat file naming + kind-based scope + question archive
+
+### R17 · Filename prefix `HANDOFF-` retired (cross-cutting)
+**Decision (mirrored from hand-off/DECISIONS.md R17):** Handoff docs use natural short names; no `HANDOFF-` prefix. The enclosing directory identifies the scope.
+**Take-over impact:** Step 3 layered load references `context.md` / `task.md` / `questions.md` (was `HANDOFF-*.md`). No behavioural change; only naming.
+
+### R18 · Kind-based scope discovery (cross-cutting)
+**Decision (mirrored):** Scope detection reads YAML `kind` frontmatter from the six candidate filenames.
+**Take-over impact:** Step 0 `list-scopes` output is now scope-safe against arbitrary `context.md`/`task.md` files that lack handoff frontmatter — take-over won't propose bogus resume targets.
+
+### R19 · `questions.md` with `## Open` / `## Closed` sections
+**Decision (mirrored):** Frontmatter `kind: questions`. Doc structured as `## Open` + `## Closed`. `apply_soft_conflicts` now writes SOFT conflicts as `### Soft conflict · <type> · <timestamp>` entries under `## Open`.
+**Take-over impact:** Step 5 SOFT conflict flow unchanged in spirit; entries are now individually resolvable via `<!-- resolved -->` (which the next `hand-off` will archive, not delete).
+
+### R20 · Resolved questions archive to `## Closed` (hand-off specific, take-over aware)
+**Decision (mirrored):** On next `hand-off clean-up`, `<!-- resolved -->` questions move to `## Closed`, preserving history.
+**Take-over impact:** L1 load reads `questions.md` including the Closed section, so take-over sees historical decisions when resuming.
+
+### R21 · Scope defined by task range, not directory role (methodological)
+**Decision (mirrored):** No canonical scope location. Agent + user negotiate per task via `list-scopes` and `clarify`.
+**Take-over impact:** Step 0 was rewritten to describe scope discovery + user-selection explicitly. Prior wording implied a fixed `.hermes/handoff/` location.
+
+### R22 · Rev-B dogfood bugs fixed (cross-cutting)
+**Decision (mirrored):** MSYS `/tmp/...` path resolution + line-anchored `<session-tools-log>` regex.
+**Take-over impact:** `check-reality` no longer false-positives SOFT conflicts on walkthroughs that mention `<session-tools-log>` in prose (bug caught by rev-B dogfood).
+
+### R23 · `_SECTION_RE` extended to `#{2,3}` (cross-cutting)
+**Decision (mirrored):** Section splitting now covers h2 + h3 so questions' `### <ID> · <title>` entries are classifiable.
+**Take-over impact:** none direct — take-over does not classify; only load. `apply_soft_conflicts` gains ability to append `### Soft conflict …` entries cleanly under `## Open`.

@@ -2,7 +2,7 @@
 
 > **Status:** 开发时正本（development source-of-reference）
 > **不作为 skill 加载。** Skill loader 忽略 `_shared/` 前缀。
-> **PROTOCOL.md 状态:** v0.3 全景快照，仅供参考。两个 skill 的 `PROTOCOL.md` 已演进为 v0.4（视角改写 + 后续 Review 修订），是唯一权威。
+> **PROTOCOL.md 状态:** v0.3 全景快照，仅供参考。两个 skill 的 `PROTOCOL.md` 已演进为 v0.5-rev-C（flat-file layout, no HANDOFF- prefix, kind-based scope, question `## Open`/`## Closed` archive），是唯一权威。
 
 ---
 

@@ -3,31 +3,59 @@
 # requires-python = ">=3.11"
 # dependencies = ["pyyaml>=6.0"]
 # ///
-"""Session Handoff Protocol · reconcile helper.
+"""Session Handoff Protocol · reconcile helper (v0.5 · flat-file layout).
 
-Deterministic logic for the `hand-off` / `take-over` skills. Keeping YAML
+Deterministic logic for the `hand-off` / `take-over` skills. Keeps YAML
 parsing, git reality-check, cleanup classification, and atomic writes out
 of the LLM's cognitive path (protocol §9 invariant "script-assisted
 execution").
 
+Layout (v0.5, flat-file, no prefix)
+-----------------------------------
+Every handoff scope lives DIRECTLY inside a directory. The four core files
+use their natural short names — the enclosing directory identifies what
+they belong to:
+
+    <scope>/context.md
+    <scope>/task.md
+    <scope>/walkthrough.md
+    <scope>/questions.md
+    <scope>/plan.md         (optional)
+    <scope>/review.md       (optional)
+
+A "scope" is any directory containing at least one file whose YAML
+frontmatter carries a recognised handoff ``kind`` value. This avoids
+false positives from unrelated ``context.md`` / ``task.md`` files in
+generic projects.
+
+Scope resolution
+----------------
+1. If ``--scope <path>`` is passed, use it verbatim.
+2. Else if pwd contains at least one file with recognised handoff ``kind``
+   frontmatter, use pwd (silent).
+3. Else emit ``WARNING`` on stderr with an explicit prompt structure so the
+   caller (agent) can decide via ``clarify`` whether to init at pwd or
+   pick another location. Exit code 3 for this "ambiguous scope" state.
+
 Commands
 --------
-init                             create <target-dir>/ from templates
-validate                         frontmatter enum + timestamp sanity across docs
-check-reality [--apply-soft-conflicts]
-                                 verify docs vs git/fs; optionally log SOFT
-                                 conflicts to open-questions.md
-clean-up (--dry-run | --apply)   classify walkthrough / open-questions
-                                 entries as CLEAR / STALE / KEEP / UNSURE;
-                                 UNSURE items are surfaced only, never deleted
+init      [--scope P]              write core docs at scope from templates
+validate  [--scope P | --all-scopes]  frontmatter enum + timestamp sanity
+check-reality [--scope P | --all-scopes] [--apply-soft-conflicts]
+                                   verify docs vs git/fs; log SOFT conflicts
+clean-up  [--scope P | --all-scopes] (--dry-run | --apply)
+                                   classify walkthrough / questions entries;
+                                   ``<!-- resolved -->`` questions migrate
+                                   to the ``## Closed`` archive section.
 write-atomic --filepath P (--content S | --content-file P | stdin)
-                                 write P atomically via <P>.tmp + rename
+                                   write P atomically via <P>.tmp + rename
+list-scopes  [--root R]            find every scope under R (default: cwd)
 
 Invocation
 ----------
-Skills are expected to call this via::
+Skills call this via::
 
-    uv run --isolated python <SKILL_DIR>/scripts/reconcile.py <command> ...
+    uv run <SKILL_DIR>/scripts/reconcile.py <command> [--scope ...] ...
 
 which uses the inline script metadata above to install pyyaml on demand.
 Running via bare `python` requires pyyaml on the ambient interpreter.
@@ -49,7 +77,7 @@ try:
 except ImportError:  # pragma: no cover - environment error path
     sys.stderr.write(
         "reconcile.py: missing pyyaml. Run via "
-        "'uv run --isolated python .../reconcile.py ...' so uv installs the "
+        "'uv run <path>/reconcile.py ...' so uv installs the "
         "inline-script dependency automatically.\n"
     )
     sys.exit(2)
@@ -61,16 +89,27 @@ except ImportError:  # pragma: no cover - environment error path
 SCRIPT_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = SCRIPT_DIR.parent / "templates"
 
-DEFAULT_DOCS = ["context.md", "task.md", "walkthrough.md", "open-questions.md"]
+DEFAULT_DOCS = ["context.md", "task.md", "walkthrough.md", "questions.md"]
 OPTIONAL_DOCS = ["plan.md", "review.md"]
 ALL_DOCS = DEFAULT_DOCS + OPTIONAL_DOCS
 
-VALID_KINDS = {"context", "task", "walkthrough", "open-questions", "plan", "review"}
+VALID_KINDS = {"context", "task", "walkthrough", "questions", "plan", "review"}
 VALID_STATUS = {"in-progress", "blocked", "phase-complete", "archived"}
 VALID_WRITERS = {"hand-off", "take-over", "user", "migration"}
 
 STALE_DAYS = 30           # walkthrough entry auto-stale threshold
 VERIFY_STALE_DAYS = 7     # last_verified SOFT-conflict threshold
+
+# Directories skipped when scanning for scopes (list-scopes / --all-scopes).
+SCOPE_SCAN_SKIP_DIRS = {
+    ".git", "node_modules", ".venv", "venv", "__pycache__", ".pytest_cache",
+    ".mypy_cache", ".tox", "dist", "build", "target", ".idea", ".vscode",
+    ".ruff_cache",
+}
+SCOPE_SCAN_MAX_DEPTH = 6
+
+# Candidate filenames whose frontmatter is inspected during scope detection.
+_SCOPE_CANDIDATE_NAMES = set(ALL_DOCS)
 
 # ---------------------------------------------------------------------------
 # Frontmatter (pyyaml-backed)
@@ -80,10 +119,6 @@ _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?(.*)\Z", re.DOTALL)
 
 
 def load_frontmatter(text: str) -> tuple[dict, str]:
-    """Parse YAML frontmatter + body. Returns ({}, text) if none present.
-
-    Raises ValueError on malformed frontmatter (agent should treat as HARD).
-    """
     if not text.startswith("---"):
         return {}, text
     m = _FRONTMATTER_RE.match(text)
@@ -102,19 +137,12 @@ def load_frontmatter(text: str) -> tuple[dict, str]:
 
 
 def dump_frontmatter(meta: dict, body: str) -> str:
-    """Serialize back to frontmatter + body. Body is preserved verbatim.
-
-    Fixes the double-newline bug from the earlier hand-rolled serializer:
-    the ``---`` fence closes with exactly one ``\\n`` and the body is
-    joined without a leading newline.
-    """
     yaml_str = yaml.safe_dump(meta, sort_keys=False, allow_unicode=True).rstrip()
     body = body.lstrip("\n")
     return f"---\n{yaml_str}\n---\n\n{body}" if body else f"---\n{yaml_str}\n---\n"
 
 
 def parse_iso_timestamp(v: object) -> tuple[bool, str | None]:
-    """Return (ok, err). Naive datetimes are rejected."""
     if isinstance(v, datetime):
         return (True, None) if v.tzinfo else (False, "naive datetime (missing timezone)")
     if not isinstance(v, str):
@@ -139,7 +167,6 @@ def as_aware_datetime(v: object) -> datetime | None:
 
 
 def validate_meta(meta: dict, filename: str) -> list[str]:
-    """Return list of validation errors (empty = OK)."""
     errors: list[str] = []
     kind = meta.get("kind")
     if kind not in VALID_KINDS:
@@ -171,12 +198,38 @@ def validate_meta(meta: dict, filename: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Path helpers (MSYS-aware)
+# ---------------------------------------------------------------------------
+
+
+def resolve_msys_path(p: str | os.PathLike[str]) -> Path:
+    """Translate MSYS-style paths (/c/foo, /tmp/foo) to native Windows paths.
+
+    On non-Windows hosts this is a no-op wrapper around ``Path``.
+    """
+    s = os.fspath(p)
+    if os.name != "nt":
+        return Path(s)
+    # /c/foo → C:/foo, /d/foo → D:/foo, etc.
+    m = re.match(r"^/([A-Za-z])/(.*)$", s)
+    if m:
+        return Path(f"{m.group(1).upper()}:/{m.group(2)}")
+    # /tmp/... → $TMPDIR or $TEMP or C:\Users\<u>\AppData\Local\Temp
+    if s.startswith("/tmp/") or s == "/tmp":
+        tmp_root = os.environ.get("TMPDIR") or os.environ.get("TEMP") or os.environ.get("TMP")
+        if tmp_root:
+            tail = s[len("/tmp"):].lstrip("/")
+            return Path(tmp_root) / tail if tail else Path(tmp_root)
+    return Path(s)
+
+
+# ---------------------------------------------------------------------------
 # Atomic write (POSIX rename + Windows os.replace)
 # ---------------------------------------------------------------------------
 
 
 def write_atomic(filepath: str | os.PathLike[str], content: str) -> None:
-    fp = Path(filepath)
+    fp = resolve_msys_path(filepath)
     fp.parent.mkdir(parents=True, exist_ok=True)
     tmp = fp.with_suffix(fp.suffix + ".tmp")
     tmp.write_text(content, encoding="utf-8", newline="\n")
@@ -236,19 +289,18 @@ def git_deleted_files(since_days: int = 90) -> set[str]:
 
 _FENCE_RE = re.compile(r"```.*?```", re.DOTALL)
 _PATH_TOKEN_RE = re.compile(
-    r"""(?:[`"'\(\s]|^)                          # opening delimiter
-        (                                        # capture path
-          (?:[A-Za-z]:[\\/][^\s`"'\(\)\[\]]+)    # Windows: C:\foo or C:/foo
+    r"""(?:[`"'\(\s]|^)
+        (
+          (?:[A-Za-z]:[\\/][^\s`"'\(\)\[\]]+)
           |
-          (?:/[A-Za-z]/[^\s`"'\(\)\[\]]+)        # MSYS:   /c/foo
+          (?:/[A-Za-z]/[^\s`"'\(\)\[\]]+)
           |
-          (?:/[^\s`"'\(\)\[\]]+)                 # POSIX:  /foo/bar
+          (?:/[^\s`"'\(\)\[\]]+)
         )
     """,
     re.VERBOSE,
 )
 
-# Deny-list for tokens that look like paths but are documentation examples.
 _PATH_DENY_PREFIXES = (
     "/http", "/dev/", "/tmp/", "/usr/bin/", "/etc/", "/proc/", "/sys/",
     "/var/", "//",
@@ -269,12 +321,8 @@ def _looks_like_file_reference(candidate: str) -> bool:
 
 
 def normalize_reference_path(p: str) -> Path:
-    """Turn MSYS ``/c/foo`` into ``C:/foo`` on Windows; return Path."""
-    if os.name == "nt":
-        m = re.match(r"^/([A-Za-z])/(.*)$", p)
-        if m:
-            return Path(f"{m.group(1).upper()}:/{m.group(2)}")
-    return Path(p)
+    """Alias retained for backward compatibility; MSYS-aware."""
+    return resolve_msys_path(p)
 
 
 def extract_referenced_paths(body: str) -> list[str]:
@@ -292,7 +340,7 @@ def extract_referenced_paths(body: str) -> list[str]:
 # Section splitting (markdown ##)
 # ---------------------------------------------------------------------------
 
-_SECTION_RE = re.compile(r"^(##\s+.*)$", re.MULTILINE)
+_SECTION_RE = re.compile(r"^(#{2,3}\s+.*)$", re.MULTILINE)
 _DATE_IN_HEADER_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 _HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 
@@ -302,18 +350,16 @@ _KEEP_WORD_RE = re.compile(r"\b(lesson|surprise|decision|invariant)\b", re.IGNOR
 _PLACEHOLDER_RE = re.compile(r"^\s*-?\s*(none\.?|tbd\.?|n/?a\.?)\s*$",
                               re.IGNORECASE | re.MULTILINE)
 
+# Tools-log block: tags MUST be line-anchored to avoid greedy match on prose.
+_TOOLS_LOG_RE = re.compile(
+    r"^<session-tools-log>\s*\n(.*?)\n^</session-tools-log>\s*$",
+    re.DOTALL | re.MULTILINE,
+)
+
 
 def strip_html_comments_preserving_tags(text: str) -> str:
-    """Strip block-level HTML comment blocks while preserving inline markers.
-
-    We keep single-line `<!-- keep -->` / `<!-- resolved -->` markers because
-    the classifier looks for them explicitly. Multi-line/block comments that
-    contain example markdown (e.g. template sample entries) are removed so
-    their `## ...` headers don't confuse the section splitter.
-    """
     def _replace(m: re.Match[str]) -> str:
         block = m.group(0)
-        # Preserve short single-tag markers used by the classifier.
         stripped = block.strip()
         if stripped.lower() in {"<!--keep-->", "<!-- keep -->", "<!--resolved-->",
                                  "<!-- resolved -->"}:
@@ -325,7 +371,6 @@ def strip_html_comments_preserving_tags(text: str) -> str:
 
 
 def _is_placeholder(content: str) -> bool:
-    """A section body counts as a placeholder if empty or only 'None./TBD./N/A.'."""
     stripped = content.strip()
     if not stripped:
         return True
@@ -338,10 +383,6 @@ def _is_placeholder(content: str) -> bool:
 
 
 def split_sections(body: str) -> tuple[str, list[tuple[str, str]]]:
-    """Return (prefix_before_first_section, [(header_line, body_after), ...])."""
-    # Strip block-level HTML comments so template example entries don't leak
-    # into the section list. Inline `<!-- keep -->` / `<!-- resolved -->` tags
-    # are preserved by strip_html_comments_preserving_tags.
     body = strip_html_comments_preserving_tags(body)
     parts = _SECTION_RE.split(body)
     prefix = parts[0]
@@ -356,13 +397,133 @@ def split_sections(body: str) -> tuple[str, list[tuple[str, str]]]:
 
 
 # ---------------------------------------------------------------------------
+# Scope resolution
+# ---------------------------------------------------------------------------
+
+
+def _peek_kind(p: Path) -> str | None:
+    """Read only enough of file `p` to extract the frontmatter ``kind`` field.
+
+    Returns the kind string when present + recognised, else None. Cheap enough
+    to run against every ``*.md`` candidate during scope discovery.
+    """
+    try:
+        with p.open("r", encoding="utf-8", errors="replace") as fh:
+            head = fh.read(1024)
+    except OSError:
+        return None
+    if not head.startswith("---"):
+        return None
+    m = _FRONTMATTER_RE.match(head + "\n---\n")  # tolerate partial reads
+    if not m:
+        # Fall back to full match on the read chunk
+        m = _FRONTMATTER_RE.match(head)
+        if not m:
+            return None
+    try:
+        meta = yaml.safe_load(m.group(1)) or {}
+    except yaml.YAMLError:
+        return None
+    if not isinstance(meta, dict):
+        return None
+    kind = meta.get("kind")
+    return kind if isinstance(kind, str) and kind in VALID_KINDS else None
+
+
+def scope_has_docs(scope: Path) -> bool:
+    """A directory qualifies as a scope if any candidate file has handoff kind."""
+    if not scope.is_dir():
+        return False
+    for name in _SCOPE_CANDIDATE_NAMES:
+        candidate = scope / name
+        if candidate.is_file() and _peek_kind(candidate) is not None:
+            return True
+    return False
+
+
+def scope_docs_present(scope: Path) -> list[str]:
+    """Return the ordered list of recognised handoff docs actually present."""
+    present: list[str] = []
+    for name in ALL_DOCS:
+        candidate = scope / name
+        if candidate.is_file() and _peek_kind(candidate) is not None:
+            present.append(name)
+    return present
+
+
+def resolve_scope(explicit: str | None, *, allow_missing: bool = False) -> Path:
+    """Resolve the target scope directory.
+
+    Rules:
+      1. explicit `--scope <path>`: use verbatim (after MSYS resolution).
+      2. pwd contains recognised handoff docs: use pwd silently.
+      3. Otherwise emit WARNING on stderr describing the ambiguity and
+         exit with code 3 unless ``allow_missing=True`` (used by ``init``).
+    """
+    if explicit:
+        p = resolve_msys_path(explicit).resolve()
+        return p
+
+    cwd = Path.cwd()
+    if scope_has_docs(cwd):
+        return cwd
+
+    if allow_missing:
+        return cwd
+
+    sys.stderr.write(
+        "WARNING: no handoff docs found in current directory "
+        f"{cwd}.\n"
+        "  Options:\n"
+        "    (a) init a new scope here by running:\n"
+        f"          reconcile.py init --scope {cwd}\n"
+        "    (b) specify an existing scope:\n"
+        "          reconcile.py <cmd> --scope /path/to/scope\n"
+        "    (c) discover existing scopes:\n"
+        "          reconcile.py list-scopes\n"
+    )
+    sys.stderr.flush()
+    print(json.dumps({
+        "status": "ambiguous_scope",
+        "message": (
+            "No handoff docs (recognised kind frontmatter) in cwd and no "
+            "--scope given. Agent must clarify with the user before proceeding."
+        ),
+        "cwd": str(cwd),
+    }, indent=2))
+    sys.exit(3)
+
+
+def find_scopes(root: Path, max_depth: int = SCOPE_SCAN_MAX_DEPTH) -> list[Path]:
+    """Return all scope directories at or below ``root`` (deduped, sorted)."""
+    root = root.resolve()
+    results: set[Path] = set()
+
+    def _walk(cur: Path, depth: int) -> None:
+        if depth > max_depth:
+            return
+        try:
+            entries = list(cur.iterdir())
+        except OSError:
+            return
+        if scope_has_docs(cur):
+            results.add(cur.resolve())
+        for p in entries:
+            if p.is_dir() and p.name not in SCOPE_SCAN_SKIP_DIRS and not p.is_symlink():
+                _walk(p, depth + 1)
+
+    _walk(root, 0)
+    return sorted(results)
+
+
+# ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
 
 
 def cmd_init(args: argparse.Namespace) -> None:
-    target_dir = Path(args.target_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
+    scope = resolve_scope(args.scope, allow_missing=True)
+    scope.mkdir(parents=True, exist_ok=True)
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     agent = args.agent or "unknown-agent"
     session_id = args.session_id or "unknown-session"
@@ -372,7 +533,7 @@ def cmd_init(args: argparse.Namespace) -> None:
     skipped: list[str] = []
     missing_templates: list[str] = []
     for doc in DEFAULT_DOCS:
-        target = target_dir / doc
+        target = scope / doc
         if target.exists():
             skipped.append(doc)
             continue
@@ -393,6 +554,7 @@ def cmd_init(args: argparse.Namespace) -> None:
 
     result = {
         "status": "success" if not missing_templates else "partial",
+        "scope": str(scope),
         "initialized": initialized,
         "skipped": skipped,
         "missing_templates": missing_templates,
@@ -402,16 +564,15 @@ def cmd_init(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
-def cmd_validate(args: argparse.Namespace) -> None:
-    target_dir = Path(args.target_dir)
-    if not target_dir.exists():
-        print(json.dumps({"status": "error", "message": f"{target_dir} does not exist"}))
-        sys.exit(1)
+def _validate_scope(scope: Path) -> dict:
+    if not scope.exists():
+        return {"scope": str(scope), "status": "error",
+                "message": f"{scope} does not exist"}
     errors: list[str] = []
     warnings: list[str] = []
     checked: list[str] = []
     for doc in ALL_DOCS:
-        p = target_dir / doc
+        p = scope / doc
         if not p.exists():
             if doc in DEFAULT_DOCS:
                 warnings.append(f"{doc}: missing (core doc)")
@@ -423,74 +584,68 @@ def cmd_validate(args: argparse.Namespace) -> None:
             continue
         checked.append(doc)
         errors.extend(validate_meta(meta, doc))
-    result = {
+    return {
+        "scope": str(scope),
         "status": "success" if not errors else "invalid",
         "checked": checked,
         "warnings": warnings,
         "errors": errors,
     }
-    print(json.dumps(result, indent=2))
-    if errors:
+
+
+def cmd_validate(args: argparse.Namespace) -> None:
+    scopes = _collect_scopes(args)
+    results = [_validate_scope(s) for s in scopes]
+    payload = _wrap_batch(results)
+    print(json.dumps(payload, indent=2))
+    if any(r.get("errors") for r in results):
         sys.exit(1)
 
 
-def cmd_check_reality(args: argparse.Namespace) -> None:
-    target_dir = Path(args.target_dir)
-    if not target_dir.exists():
-        print(json.dumps({
-            "status": "error",
-            "message": f"Handoff directory {target_dir} does not exist. Run init first.",
-        }))
-        sys.exit(1)
+def _check_reality_scope(scope: Path, apply_soft: bool) -> dict:
+    if not scope.exists():
+        return {"scope": str(scope), "status": "error",
+                "message": f"scope {scope} does not exist"}
 
     hard_conflicts: list[dict] = []
     soft_conflicts: list[dict] = []
     uncommitted = git_status_paths()
 
-    # 1. Frontmatter validity + stale verification
     for doc in ALL_DOCS:
-        p = target_dir / doc
+        p = scope / doc
         if not p.exists():
             continue
         try:
             meta, _ = load_frontmatter(p.read_text(encoding="utf-8"))
         except ValueError as e:
             hard_conflicts.append({
-                "type": "frontmatter_parse_error",
-                "file": doc,
-                "message": str(e),
+                "type": "frontmatter_parse_error", "file": doc, "message": str(e),
             })
             continue
         for err in validate_meta(meta, doc):
             hard_conflicts.append({
-                "type": "frontmatter_invalid",
-                "file": doc,
-                "message": err,
+                "type": "frontmatter_invalid", "file": doc, "message": err,
             })
-
         lv = meta.get("last_verified")
         if lv and lv != "SKIPPED":
             dt = as_aware_datetime(lv)
             if dt is None:
                 soft_conflicts.append({
-                    "type": "invalid_or_naive_timestamp",
-                    "file": doc,
+                    "type": "invalid_or_naive_timestamp", "file": doc,
                     "message": f"last_verified={lv!r} is naive or unparseable",
                 })
             else:
                 delta_days = (datetime.now(timezone.utc) - dt).days
                 if delta_days > VERIFY_STALE_DAYS:
                     soft_conflicts.append({
-                        "type": "stale_verification",
-                        "file": doc,
+                        "type": "stale_verification", "file": doc,
                         "message": (
                             f"last_verified is {delta_days} days old "
                             f"(> {VERIFY_STALE_DAYS})"
                         ),
                     })
 
-    # 2. task.md → referenced files exist on filesystem?
-    task_path = target_dir / "task.md"
+    task_path = scope / "task.md"
     if task_path.exists():
         try:
             _, body = load_frontmatter(task_path.read_text(encoding="utf-8"))
@@ -507,16 +662,13 @@ def cmd_check_reality(args: argparse.Namespace) -> None:
                     ),
                 })
 
-    # 3. walkthrough.md → <session-tools-log> cross-checked against git
-    wt_path = target_dir / "walkthrough.md"
+    wt_path = scope / "walkthrough.md"
     if wt_path.exists():
         try:
             _, body = load_frontmatter(wt_path.read_text(encoding="utf-8"))
         except ValueError:
             body = ""
-        tools_log_match = re.search(
-            r"<session-tools-log>(.*?)</session-tools-log>", body, re.DOTALL
-        )
+        tools_log_match = _TOOLS_LOG_RE.search(body)
         if tools_log_match:
             raw = tools_log_match.group(1).strip()
             if raw and raw != "[]":
@@ -552,55 +704,71 @@ def cmd_check_reality(args: argparse.Namespace) -> None:
                             })
 
     result: dict = {
+        "scope": str(scope),
         "status": "success",
         "hard_conflicts": hard_conflicts,
         "soft_conflicts": soft_conflicts,
     }
-
-    if getattr(args, "apply_soft_conflicts", False) and soft_conflicts:
-        result["applied_soft_conflicts"] = apply_soft_conflicts(target_dir, soft_conflicts)
-
-    print(json.dumps(result, indent=2))
+    if apply_soft and soft_conflicts:
+        result["applied_soft_conflicts"] = apply_soft_conflicts(scope, soft_conflicts)
+    return result
 
 
-def apply_soft_conflicts(target_dir: Path, conflicts: list[dict]) -> int:
-    """Append SOFT conflicts to open-questions.md's ``## Soft Conflicts`` section."""
-    oq = target_dir / "open-questions.md"
-    if not oq.exists():
+def cmd_check_reality(args: argparse.Namespace) -> None:
+    scopes = _collect_scopes(args)
+    results = [_check_reality_scope(s, args.apply_soft_conflicts) for s in scopes]
+    payload = _wrap_batch(results)
+    print(json.dumps(payload, indent=2))
+
+
+def apply_soft_conflicts(scope: Path, conflicts: list[dict]) -> int:
+    """Append SOFT conflicts as ### subsections under ## Open in questions.md.
+
+    Each conflict becomes its own `### Soft conflict · <type> · <timestamp>`
+    entry so it can be individually resolved by adding `<!-- resolved -->`
+    (which the next hand-off will archive to ## Closed).
+    """
+    q = scope / "questions.md"
+    if not q.exists() or not conflicts:
         return 0
-    meta, body = load_frontmatter(oq.read_text(encoding="utf-8"))
+    meta, body = load_frontmatter(q.read_text(encoding="utf-8"))
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    heading = "## Soft Conflicts (Reconciled)"
-    lines = [
-        f"- ⚠️ `{now}` · **{c.get('type', 'unknown')}** — {c.get('message', '')}"
-        for c in conflicts
-    ]
-    block = "\n".join(lines) + "\n"
+    entries: list[str] = []
+    for c in conflicts:
+        ctype = c.get("type", "unknown")
+        msg = c.get("message", "")
+        entries.append(f"### Soft conflict · {ctype} · {now}\n\n- ⚠️ {msg}\n\n")
+    block = "".join(entries)
 
-    if heading in body:
-        idx = body.find(heading) + len(heading)
-        # Insert on a new line immediately after the heading, preserving any
-        # trailing "- None." placeholder line below it.
-        body = body[:idx] + "\n\n" + block + body[idx:].lstrip("\n")
+    if "## Open" in body:
+        # Insert immediately after the '## Open' header + trailing blank line
+        marker = "## Open"
+        idx = body.find(marker) + len(marker)
+        # Skip to end of the ## Open header line and following blank lines
+        rest = body[idx:]
+        # Preserve one newline after header, insert block, then rest
+        # Find first double-newline or end-of-first-line
+        newline_pos = rest.find("\n")
+        after_header = rest[newline_pos + 1 :] if newline_pos >= 0 else rest
+        body = body[:idx] + "\n\n" + block + after_header.lstrip("\n")
     else:
-        body = body.rstrip() + f"\n\n{heading}\n\n{block}"
-
+        # Legacy body without ## Open — inject the whole structure
+        body = body.rstrip() + f"\n\n## Open\n\n{block}## Closed\n\n- None.\n"
     meta["last_updated"] = now
     meta["last_writer"] = "take-over"
-    write_atomic(oq, dump_frontmatter(meta, body))
+    write_atomic(q, dump_frontmatter(meta, body))
     return len(conflicts)
 
 
-def classify_cleanup(target_dir: Path) -> dict:
-    """Return classification plan (does NOT mutate anything on disk)."""
+def classify_cleanup(scope: Path) -> dict:
     removed_clear: list[dict] = []
     removed_stale: list[dict] = []
     unsure_items: list[dict] = []
     kept: list[dict] = []
+    archived: list[dict] = []  # questions to move from ## Open to ## Closed
     deleted_files = git_deleted_files(90)
 
-    # --- walkthrough.md ---
-    wt = target_dir / "walkthrough.md"
+    wt = scope / "walkthrough.md"
     if wt.exists():
         try:
             _, body = load_frontmatter(wt.read_text(encoding="utf-8"))
@@ -611,48 +779,39 @@ def classify_cleanup(target_dir: Path) -> dict:
             title = header.strip("# \r\n")
             date_match = _DATE_IN_HEADER_RE.search(header)
             if not date_match:
-                # Non-dated section (e.g. "## History of Active Entries") — leave.
                 continue
             date_str = date_match.group(1)
-
-            # Priority: KEEP > CLEAR > STALE > UNSURE
             if (_KEEP_TAG_RE.search(header) or _KEEP_TAG_RE.search(content)
                     or _KEEP_WORD_RE.search(header)):
                 kept.append({"file": "walkthrough.md", "header": title,
                              "reason": "keep marker or keyword"})
                 continue
-
             if _RESOLVED_TAG_RE.search(content) or _RESOLVED_TAG_RE.search(header):
                 removed_clear.append({"file": "walkthrough.md", "header": title,
                                       "reason": "explicit <!-- resolved --> marker"})
                 continue
-
-            # CLEAR by git evidence: all referenced files present in deleted set
             path_refs = extract_referenced_paths(content)
             if path_refs and all(
                 any(df.endswith(pr.replace("\\", "/").lstrip("/")) for df in deleted_files)
                 for pr in path_refs
             ):
                 removed_clear.append({
-                    "file": "walkthrough.md",
-                    "header": title,
+                    "file": "walkthrough.md", "header": title,
                     "reason": (
                         "all referenced files deleted in git history "
                         "(--diff-filter=D within 90 days)"
                     ),
                 })
                 continue
-
             try:
                 entry_date = datetime.strptime(date_str, "%Y-%m-%d").date()
                 delta_days = (datetime.now(timezone.utc).date() - entry_date).days
             except ValueError:
                 delta_days = 0
-
             if delta_days > STALE_DAYS:
                 in_use = False
                 for doc in ("task.md", "context.md"):
-                    p = target_dir / doc
+                    p = scope / doc
                     if p.exists():
                         text = p.read_text(encoding="utf-8")
                         if date_str in text or title in text:
@@ -660,105 +819,203 @@ def classify_cleanup(target_dir: Path) -> dict:
                             break
                 if not in_use:
                     removed_stale.append({
-                        "file": "walkthrough.md",
-                        "header": title,
+                        "file": "walkthrough.md", "header": title,
                         "age_days": delta_days,
                     })
                     continue
-
             unsure_items.append({
-                "file": "walkthrough.md",
-                "header": title,
+                "file": "walkthrough.md", "header": title,
                 "snippet": content.strip().split("\n", 1)[0][:120],
             })
 
-    # --- open-questions.md ---
-    oq = target_dir / "open-questions.md"
+    oq = scope / "questions.md"
     if oq.exists():
         try:
             _, body = load_frontmatter(oq.read_text(encoding="utf-8"))
         except ValueError:
             body = ""
-        _, sections = split_sections(body)
+        prefix, sections = split_sections(body)
+        # Determine which top-level section a subsection lives under. We only
+        # classify entries under `## Open`; entries already under `## Closed`
+        # stay put (they're the archive).
+        current_top = None
         for header, content in sections:
             title = header.strip("# \r\n")
-            if "Soft Conflicts" in title:
+            # Detect top-level Open / Closed section headers (## level 2)
+            # from the raw header text.
+            stripped_hash = header.lstrip("#").strip()
+            hash_count = len(header) - len(header.lstrip("#"))
+            if hash_count == 2 and stripped_hash.lower() in ("open", "closed"):
+                current_top = stripped_hash.lower()
+                if _KEEP_TAG_RE.search(header) or _KEEP_TAG_RE.search(content):
+                    kept.append({"file": "questions.md", "header": title,
+                                 "reason": "structural section, always kept"})
                 continue
+            # Entries already under ## Closed are archived; leave untouched.
+            if current_top == "closed":
+                kept.append({"file": "questions.md", "header": title,
+                             "reason": "already archived under ## Closed"})
+                continue
+            # Entries under ## Open (or top-level, legacy) — classify.
             if _KEEP_TAG_RE.search(header) or _KEEP_TAG_RE.search(content):
-                kept.append({"file": "open-questions.md", "header": title,
+                kept.append({"file": "questions.md", "header": title,
                              "reason": "explicit <!-- keep --> marker"})
                 continue
             if _RESOLVED_TAG_RE.search(content) or _RESOLVED_TAG_RE.search(header):
-                removed_clear.append({"file": "open-questions.md", "header": title,
-                                      "reason": "explicit <!-- resolved --> marker"})
+                # NEW SEMANTICS: resolved questions ARCHIVE (move to Closed),
+                # not delete. They stay forever for historical review.
+                archived.append({"file": "questions.md", "header": title,
+                                 "reason": "explicit <!-- resolved --> marker",
+                                 "content": content})
                 continue
             if _is_placeholder(content):
-                kept.append({"file": "open-questions.md", "header": title,
+                kept.append({"file": "questions.md", "header": title,
                              "reason": "placeholder (empty or '- None.')"})
                 continue
             unsure_items.append({
-                "file": "open-questions.md",
-                "header": title,
+                "file": "questions.md", "header": title,
                 "snippet": content.strip().split("\n", 1)[0][:120],
             })
 
-    return {
-        "clear": removed_clear,
-        "stale": removed_stale,
-        "kept": kept,
-        "unsure": unsure_items,
-    }
+    return {"clear": removed_clear, "stale": removed_stale,
+            "kept": kept, "unsure": unsure_items, "archived": archived}
 
 
-def apply_cleanup(target_dir: Path, plan: dict) -> dict:
+def _rebuild_questions_body(body: str, archived: list[dict], to_remove: set[tuple[str, str]]) -> str:
+    """Rebuild questions.md body: move archived entries from ## Open to ## Closed.
+
+    Preserves:
+      - prefix (frontmatter body prelude before first section)
+      - ## Open header + its non-archived subsections
+      - ## Closed header + its existing entries + newly archived entries appended
+    """
+    prefix, sections = split_sections(body)
+    archived_titles = {a["header"] for a in archived if a["file"] == "questions.md"}
+    archived_content_by_title = {a["header"]: a["content"] for a in archived
+                                 if a["file"] == "questions.md"}
+
+    open_entries: list[tuple[str, str]] = []      # (header, content) under ## Open
+    closed_entries: list[tuple[str, str]] = []    # existing content under ## Closed
+    current_top: str | None = None
+    has_open_header = False
+    has_closed_header = False
+
+    for header, content in sections:
+        stripped = header.lstrip("#").strip()
+        hash_count = len(header) - len(header.lstrip("#"))
+        # Detect ## Open / ## Closed top-level headers
+        if hash_count == 2 and stripped.lower() in ("open", "closed"):
+            current_top = stripped.lower()
+            if current_top == "open":
+                has_open_header = True
+            else:
+                has_closed_header = True
+            continue
+        # Under ## Closed — preserve
+        if current_top == "closed":
+            closed_entries.append((header, content))
+            continue
+        # Under ## Open (or legacy top-level)
+        title = header.strip("# \r\n")
+        if title in archived_titles:
+            continue  # will be moved to Closed
+        if ("questions.md", title) in to_remove:
+            continue  # explicit delete (rare; only if user pushes STALE)
+        open_entries.append((header, content))
+
+    # Assemble new body
+    parts: list[str] = [prefix]
+    parts.append("## Open\n\n" if not has_open_header else "## Open\n\n")
+    for header, content in open_entries:
+        parts.append(header)
+        parts.append(content)
+    if not open_entries:
+        parts.append("- None.\n\n")
+    parts.append("## Closed\n\n")
+    for header, content in closed_entries:
+        parts.append(header)
+        parts.append(content)
+    for a in archived:
+        if a["file"] != "questions.md":
+            continue
+        # Re-emit as a subsection (### level) so nesting under ## Closed is clean
+        title = a["header"]
+        content = archived_content_by_title.get(title, "")
+        parts.append(f"### {title}\n")
+        parts.append(content if content.endswith("\n") else content + "\n")
+
+    return "".join(parts)
+
+
+def apply_cleanup(scope: Path, plan: dict) -> dict:
     to_remove = {
         (item["file"], item["header"])
         for item in plan.get("clear", []) + plan.get("stale", [])
     }
-    applied = {"walkthrough.md": 0, "open-questions.md": 0}
+    archived = plan.get("archived", [])
+    applied = {"walkthrough.md": 0, "questions.md": 0, "archived_to_closed": 0}
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
-    for doc in ("walkthrough.md", "open-questions.md"):
-        p = target_dir / doc
-        if not p.exists():
-            continue
-        meta, body = load_frontmatter(p.read_text(encoding="utf-8"))
+    # walkthrough.md — straight deletion (unchanged from prior behaviour)
+    wt = scope / "walkthrough.md"
+    if wt.exists():
+        meta, body = load_frontmatter(wt.read_text(encoding="utf-8"))
         prefix, sections = split_sections(body)
         rebuilt = [prefix]
         for header, content in sections:
             title = header.strip("# \r\n")
-            if (doc, title) in to_remove:
-                applied[doc] += 1
+            if ("walkthrough.md", title) in to_remove:
+                applied["walkthrough.md"] += 1
                 continue
             rebuilt.append(header)
             rebuilt.append(content)
         meta["last_updated"] = now
         meta["last_writer"] = "hand-off"
-        write_atomic(p, dump_frontmatter(meta, "".join(rebuilt)))
+        write_atomic(wt, dump_frontmatter(meta, "".join(rebuilt)))
+
+    # questions.md — archive resolved entries to ## Closed
+    q = scope / "questions.md"
+    if q.exists():
+        meta, body = load_frontmatter(q.read_text(encoding="utf-8"))
+        new_body = _rebuild_questions_body(body, archived, to_remove)
+        # Count how many were moved (from archived list, filtered to this file)
+        moved_count = sum(1 for a in archived if a["file"] == "questions.md")
+        applied["archived_to_closed"] += moved_count
+        # Also count any hard-delete of questions (STALE / CLEAR)
+        deleted_count = sum(1 for h in to_remove if h[0] == "questions.md")
+        applied["questions.md"] += deleted_count
+        meta["last_updated"] = now
+        meta["last_writer"] = "hand-off"
+        write_atomic(q, dump_frontmatter(meta, new_body))
+
     return applied
 
 
+def _clean_up_scope(scope: Path, dry_run: bool) -> dict:
+    if not scope.exists():
+        return {"scope": str(scope), "status": "error",
+                "message": f"scope {scope} does not exist"}
+    plan = classify_cleanup(scope)
+    if dry_run:
+        return {"scope": str(scope), "status": "planned", **plan}
+    applied = apply_cleanup(scope, plan)
+    return {"scope": str(scope), "status": "applied", **plan, "applied": applied}
+
+
 def cmd_clean_up(args: argparse.Namespace) -> None:
-    target_dir = Path(args.target_dir)
-    if not target_dir.exists():
-        print(json.dumps({"status": "error", "message": f"{target_dir} not found"}))
-        sys.exit(1)
-
-    plan = classify_cleanup(target_dir)
-    if args.dry_run:
-        print(json.dumps({"status": "planned", **plan}, indent=2))
-        return
-
-    applied = apply_cleanup(target_dir, plan)
-    print(json.dumps({"status": "applied", **plan, "applied": applied}, indent=2))
+    scopes = _collect_scopes(args)
+    results = [_clean_up_scope(s, args.dry_run) for s in scopes]
+    payload = _wrap_batch(results)
+    print(json.dumps(payload, indent=2))
 
 
 def cmd_write_atomic(args: argparse.Namespace) -> None:
-    filepath = Path(args.filepath)
+    filepath = resolve_msys_path(args.filepath)
     if args.content is not None:
         content = args.content
     elif args.content_file:
-        content = Path(args.content_file).read_text(encoding="utf-8")
+        cf = resolve_msys_path(args.content_file)
+        content = cf.read_text(encoding="utf-8")
     else:
         content = sys.stdin.read()
     write_atomic(filepath, content)
@@ -769,23 +1026,97 @@ def cmd_write_atomic(args: argparse.Namespace) -> None:
     }))
 
 
+def cmd_list_scopes(args: argparse.Namespace) -> None:
+    root = resolve_msys_path(args.root).resolve() if args.root else Path.cwd()
+    scopes = find_scopes(root)
+    payload = []
+    for s in scopes:
+        docs_present = [
+            doc for doc in ALL_DOCS if (s / doc).exists()
+        ]
+        latest_updated = None
+        for doc in docs_present:
+            try:
+                meta, _ = load_frontmatter((s / doc).read_text(encoding="utf-8"))
+                lv = meta.get("last_updated")
+                if lv and (latest_updated is None or str(lv) > latest_updated):
+                    latest_updated = str(lv)
+            except (ValueError, OSError):
+                continue
+        payload.append({
+            "scope": str(s),
+            "relative": str(s.relative_to(root)) if s != root else ".",
+            "docs": docs_present,
+            "last_updated": latest_updated,
+        })
+    print(json.dumps({
+        "root": str(root),
+        "scope_count": len(payload),
+        "scopes": payload,
+    }, indent=2))
+
+
+# ---------------------------------------------------------------------------
+# Batch helpers (--all-scopes)
+# ---------------------------------------------------------------------------
+
+
+def _collect_scopes(args: argparse.Namespace) -> list[Path]:
+    """Resolve one or many scopes based on args."""
+    if getattr(args, "all_scopes", False):
+        root = Path.cwd()
+        scopes = find_scopes(root)
+        if not scopes:
+            sys.stderr.write(
+                f"WARNING: --all-scopes found no handoff docs under {root}\n"
+            )
+        return scopes or [root]
+    return [resolve_scope(args.scope)]
+
+
+def _wrap_batch(results: list[dict]) -> dict:
+    if len(results) == 1:
+        return results[0]
+    aggregate_status = "success"
+    for r in results:
+        st = r.get("status")
+        if st in {"error", "invalid"}:
+            aggregate_status = st
+            break
+    return {
+        "status": aggregate_status,
+        "scope_count": len(results),
+        "results": results,
+    }
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
 
+def _add_scope_args(p: argparse.ArgumentParser, *, allow_all: bool = True) -> None:
+    grp = p.add_mutually_exclusive_group()
+    grp.add_argument(
+        "--scope",
+        help="Handoff scope directory (defaults to cwd if it contains handoff docs)",
+    )
+    if allow_all:
+        grp.add_argument(
+            "--all-scopes",
+            action="store_true",
+            help="Apply to every scope discovered under cwd",
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Session Handoff · reconcile helper"
-    )
-    parser.add_argument(
-        "--target-dir",
-        default=".hermes/handoff",
-        help="Handoff directory (default: .hermes/handoff)",
+        description="Session Handoff · reconcile helper (v0.5)"
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_init = sub.add_parser("init", help="Initialize handoff directory from templates")
+    p_init = sub.add_parser("init", help="Initialize handoff docs at scope from templates")
+    _add_scope_args(p_init, allow_all=False)
     p_init.add_argument("--agent", help="Last agent name")
     p_init.add_argument("--session-id", help="Session ID")
     p_init.add_argument("--writer", default="migration",
@@ -794,21 +1125,24 @@ def main() -> None:
 
     p_val = sub.add_parser("validate",
                             help="Validate frontmatter across handoff docs")
+    _add_scope_args(p_val)
     p_val.set_defaults(func=cmd_validate)
 
     p_check = sub.add_parser("check-reality",
                               help="Verify handoff docs against git/fs")
+    _add_scope_args(p_check)
     p_check.add_argument(
         "--apply-soft-conflicts",
         action="store_true",
-        help="Also append SOFT conflicts to open-questions.md",
+        help="Also append SOFT conflicts to questions.md",
     )
     p_check.set_defaults(func=cmd_check_reality)
 
     p_clean = sub.add_parser(
         "clean-up",
-        help="Classify walkthrough / open-questions entries (two-phase)",
+        help="Classify walkthrough / questions entries (two-phase)",
     )
+    _add_scope_args(p_clean)
     grp = p_clean.add_mutually_exclusive_group(required=True)
     grp.add_argument("--dry-run", action="store_true",
                       help="Print classification plan JSON, don't mutate")
@@ -823,6 +1157,12 @@ def main() -> None:
     p_write.add_argument("--content-file",
                           help="Read payload from this file (recommended)")
     p_write.set_defaults(func=cmd_write_atomic)
+
+    p_list = sub.add_parser("list-scopes",
+                             help="Discover all handoff scopes under root")
+    p_list.add_argument("--root",
+                         help="Root directory to scan (default: cwd)")
+    p_list.set_defaults(func=cmd_list_scopes)
 
     args = parser.parse_args()
     args.func(args)

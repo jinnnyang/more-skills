@@ -54,7 +54,7 @@ Four **core** documents (always considered), two **optional** (only when produce
 | `context.md` | *What must never break* — invariants, env, credentials location, "don't touch X because Y" | **Strictly Additive-only** (grows monotonically; corrections appended at the bottom with dated entries) | Small (< 2 KB target) |
 | `task.md` | *What's happening now + next up* — persisted `todo` state | Overwritten each hand-off | Small |
 | `walkthrough.md` | *What happened, why, and any surprises* — living work-memory, pruned when items resolve | **Editable** (add on hand-off, prune resolved items) | Bounded (target < 20 KB) |
-| `open-questions.md` | *What's blocked pending human input* — **only** items requiring a **human** answer. Agent-side blockers (waiting on API/build/tool) stay in `task.md` with `[!]` marker. | Overwritten; entries removed when resolved | Small |
+| `questions.md` | *What's blocked pending human input* — **only** items requiring a **human** answer. Agent-side blockers (waiting on API/build/tool) stay in `task.md` with `[!]` marker. | Overwritten; entries removed when resolved | Small |
 
 ### 4.2 Optional (create only when relevant)
 
@@ -67,28 +67,40 @@ Four **core** documents (always considered), two **optional** (only when produce
 
 ## 5. Directory Layout
 
-Dual-track (project-scoped, in the current working directory):
+**Flat file layout, no `HANDOFF-` prefix, no `.hermes/handoff/` subdirectory.** Docs live directly in the working scope directory:
 
 ```
-.hermes/handoff/                    # Private scratch, .gitignore'd
-    context.md
-    task.md
-    walkthrough.md                  # single living file, pruned on hand-off (see §9a)
-    open-questions.md
-    plan.md                         # optional
-    review.md                       # optional
-
-docs/handoff/                       # Public, git-tracked snapshot — only when user promotes
-    (copy of the above, produced by explicit "promote" action; see §8 Step 4)
+<scope>/
+    context.md                       # invariants, additive-only
+    task.md                          # active checklist
+    walkthrough.md                   # single living file, pruned on hand-off (see §9a)
+    questions.md                     # ## Open + ## Closed
+    plan.md                          # optional
+    review.md                        # optional
 ```
+
+**Kind-based scope detection.** A directory qualifies as a scope only when at least one candidate file has YAML frontmatter carrying a recognised `kind` value (`context` / `task` / `walkthrough` / `questions` / `plan` / `review`). This prevents false positives from unrelated generic `context.md` / `task.md` files elsewhere in a project. See §5a for scope resolution.
+
+**Git-tracked by default.** Under v0.5 there is no separate "promote from private scratch" step. Handoff docs are ordinary files in the working tree; the user commits them (or not) through normal git workflow. §8 Step 4 offers commit/stage/skip via `clarify`.
 
 **Why single `walkthrough.md` (not `walkthrough/*.md`):** per DECISIONS ②, walkthrough is *working memory*, not audit log. A single file makes L3 load cost bounded by pruning discipline (§9a) — long-term audit trail already lives in `git log` and `session_search`. Per-session files created a pruning + indexing problem and were explicitly rejected.
 
-**Rule:** `hand-off` writes to `.hermes/handoff/` by default. Promoting to `docs/handoff/` is an explicit user choice ("这批留档" / "commit into repo").
+## 5a. Scope Resolution
+
+Scope is defined by **the task's range**, not by directory role. Neither "one per skill" nor "always repo root" is a rule — the agent and user negotiate per task. `reconcile.py list-scopes` enumerates all live scopes neutrally.
+
+Resolution rules for every command that takes `--scope`:
+
+1. **Explicit** — `--scope <path>` wins verbatim.
+2. **Implicit at pwd** — if pwd contains recognised handoff docs (kind-frontmatter match), pwd is used silently.
+3. **Ambiguous** — otherwise the script emits `WARNING` on stderr, prints `ambiguous_scope` JSON, and exits with code 3. Agent MUST `clarify` with the user before proceeding.
+
+Batch commands (`validate`, `check-reality`, `clean-up`) also accept `--all-scopes` to iterate over every discovered scope.
 
 ### Multi-branch caveat (deferred)
 
-Git worktree / branch-parallel work is a real problem but out of scope for MVP. If it becomes an issue, prefix with branch: `.hermes/handoff/<branch>/…`. Ignore for now.
+Git worktree / branch-parallel work is a real problem but out of scope for MVP. If it becomes an issue, prefix with branch under a per-branch scope (e.g. `<scope>/<branch>/context.md`). Ignore for now.
+
 
 ## 6. Document Format
 
@@ -96,7 +108,7 @@ Git worktree / branch-parallel work is a real problem but out of scope for MVP. 
 
 ```yaml
 ---
-kind: context | task | walkthrough | open-questions | plan | review   # MUST be one of these exact values
+kind: context | task | walkthrough | questions | plan | review   # MUST be one of these exact values
 version: 1
 last_updated: 2026-07-17T14:20:00+08:00     # MUST include timezone offset (avoid Windows/Unix parse drift)
 last_verified: 2026-07-17T14:20:00+08:00    # when reality-check last ran; use `SKIPPED` if skipped
@@ -123,7 +135,7 @@ All Python invocations use `uv run --isolated python <SKILL_DIR>/scripts/reconci
 
 ```
 Step 0  Bootstrap Check
-        - If `.hermes/handoff/` is missing, initialize the directory structure first.
+        - If `<scope>/` is missing, initialize the directory structure first.
 
 Step 1  Reality check (anti-hallucination)
         - Offload to `reconcile.py check-reality` to compute actual mutations:
@@ -164,7 +176,7 @@ Step 2  Update core docs (Atomic Write Rule: write to `.tmp` first, then rename)
              content).
            - PRUNE resolved / obsolete entries per §9a (Smart Cleanup).
            - Target size < 20 KB. If exceeded, tighten pruning; do NOT split into per-session files.
-        c) open-questions.md ← add any blockers found this session.
+        c) questions.md ← add any blockers found this session.
         d) context.md   ← only if a new invariant was learned. Additive-only; append new invariants to the bottom.
         e) plan.md / review.md ← only if produced/updated this session.
 
@@ -175,17 +187,17 @@ Step 3  Update frontmatter
         - Set status appropriately (in-progress / blocked / phase-complete).
 
 Step 4  Promote decision (optional; default = private)
-        `.hermes/handoff/` is gitignored, so no commit action for private scratch.
+        `<scope>/` is gitignored, so no commit action for private scratch.
         Ask via AskUserQuestion (clarify) with structured choices:
           "How to handle this handoff?"
-            - Leave in .hermes/handoff/ (private, no commit)
+            - Leave in <scope>/ (private, no commit)
             - Promote to docs/handoff/ and commit now
             - Promote to docs/handoff/, stage but don't commit
         Default: Leave private.
 
         **Promote semantics = COPY snapshot, not move.**
         - All file copies to `docs/handoff/` must follow the Atomic Write Rule.
-        - `.hermes/handoff/` remains the live working set and keeps evolving.
+        - `<scope>/` remains the live working set and keeps evolving.
         - `docs/handoff/` receives a copy with `frozen: true` added to each
           file's frontmatter. Skills MUST NOT re-touch frozen files on
           subsequent runs; they are a historical snapshot for humans / PR review.
@@ -212,7 +224,7 @@ Both `hand-off` and `take-over` must obey (this file focuses on what `hand-off` 
 
 ## 9a. Smart Cleanup (confidence-based auto-approval)
 
-Modeled on Hermes' "Smart" dangerous-command mode: hand-off must compress living documents (`walkthrough.md`, `open-questions.md`, `review.md`) but must not delete anything it isn't sure about.
+Modeled on Hermes' "Smart" dangerous-command mode: hand-off must compress living documents (`walkthrough.md`, `questions.md`, `review.md`) but must not delete anything it isn't sure about.
 
 **Decision Priority:** `KEEP > CLEAR > STALE > UNSURE` (retaining tags takes precedence over deleting tags).
 
@@ -231,7 +243,7 @@ Every candidate entry is classified into one of four buckets:
 
 The following auxiliary criteria are DEFERRED to a future revision and are NOT implemented in the MVP classifier (agents that need them should manually mark entries `<!-- resolved -->`):
 - Error message referenced is absent from the last N successful test runs.
-- Corresponding entry in `open-questions.md` is marked resolved.
+- Corresponding entry in `questions.md` is marked resolved.
 
 **Rationale for MVP restraint:** free-text grep for "resolved" produced too many false positives (matching phrases like "not resolved yet"). Explicit HTML-comment markers are unambiguous, machine-checkable, and orthogonal to prose.
 
@@ -250,13 +262,25 @@ Unsure about 2 items — keep or drop?
 
 **Audit trail:** every CLEAR/STALE removal is listed in the hand-off's final summary so the user sees what was cleaned. If uncertain, `hand-off` errs toward UNSURE over CLEAR.
 
+## 9b. Question Archive Semantics (v0.5-rev-C)
+
+`questions.md` uses a two-section structure — `## Open` (active) and `## Closed` (archive). Entries are `###`-level subsections under either heading.
+
+- Mark an Open entry with `<!-- resolved -->` to signal it is answered.
+- The next `hand-off clean-up --apply` **moves** every `<!-- resolved -->` entry from `## Open` to `## Closed`. The full body is preserved verbatim; the archive is permanent (retained for historical review).
+- Entries already under `## Closed` are never touched by cleanup — they are the archive.
+- The classifier reports moved entries in the `archived` bucket (in addition to `clear` / `stale` / `kept` / `unsure`).
+- Rationale: unlike `walkthrough.md` (working memory, safely prunable), `questions.md` records **decision history** that stays valuable across sessions. Deletion loses that; archive keeps it.
+
+**SOFT conflict integration.** `take-over check-reality --apply-soft-conflicts` writes each SOFT conflict as its own `### Soft conflict · <type> · <timestamp>` entry under `## Open`, making SOFT items individually resolvable through the same `<!-- resolved -->` → archive flow.
+
 ## 10. Decision Points relevant to hand-off
 
 | # | Question | Decision |
 |---|---|---|
 | ① | Document format: YAML frontmatter + MD, or plain MD? | **✅ YAML frontmatter + MD** — machine-scannable frontmatter enables cheap L1 pre-filter. |
 | ② | `walkthrough` growth control? | **✅ Single `walkthrough.md`, prune resolved items** — living work-memory, not audit log. Long-term audit trail lives in git history + `session_search`. |
-| ③ | Git commit on hand-off (promote path only)? | **✅ Ask via `clarify`, then commit with default message** — private `.hermes/handoff/` is gitignored so N/A. Promote → `docs/handoff/` always prompts with structured choices. |
+| ③ | Git commit on hand-off (promote path only)? | **✅ Ask via `clarify`, then commit with default message** — private `<scope>/` is gitignored so N/A. Promote → `docs/handoff/` always prompts with structured choices. |
 
 See `DECISIONS.md` for the full rationale and rejected alternatives.
 
@@ -274,7 +298,7 @@ Rationale: structured choices render as pickable UI, avoid ambiguity from typed 
 
 Ship the minimum that closes the loop:
 
-- **Documents:** `context.md`, `task.md`, `walkthrough.md`, `open-questions.md` only. Skip `plan.md` and `review.md` for MVP — they're optional anyway.
+- **Documents:** `context.md`, `task.md`, `walkthrough.md`, `questions.md` only. Skip `plan.md` and `review.md` for MVP — they're optional anyway.
 - **Reality check:** `git status` + `git log -5` + `todo` diff + `<session-tools-log>` check. Skip smoke tests for MVP unless marked REQUIRED in task.md.
 - **No auto-promotion** to `docs/handoff/` — always private scratch by default.
 - **No branch-prefix** — single-branch assumption.
@@ -296,7 +320,7 @@ skills/hand-off/
     context.md
     task.md
     walkthrough.md
-    open-questions.md
+    questions.md
 ```
 
 The companion skill `take-over` maintains an **independent** copy of the protocol from the resume side. The two skills do NOT share files at runtime; users can install either or both. See `DECISIONS.md` (this directory) for the rationale behind this self-contained layout.
@@ -305,8 +329,8 @@ The companion skill `take-over` maintains an **independent** copy of the protoco
 
 - How does this interact with `subagent-driven-development`? Sub-agents don't currently write handoff docs — should orchestrators propagate context to them?
 - Any hook for auto-suggesting `hand-off` when context window > 75%? (Runtime-dependent; may not be portable.)
-- Concurrent hand-off from two live sessions writing to the same `.hermes/handoff/` — MVP assumes serial execution; needs a lock file or timestamp-based conflict prompt in v2.
-- Multi-branch layout — prefix with branch (`.hermes/handoff/<branch>/…`); deferred (see §5 caveat). Reintroduces `branch:` frontmatter field.
+- Concurrent hand-off from two live sessions writing to the same `<scope>/` — MVP assumes serial execution; needs a lock file or timestamp-based conflict prompt in v2.
+- Multi-branch layout — prefix with branch (`<scope>/<branch>/…`); deferred (see §5 caveat). Reintroduces `branch:` frontmatter field.
 - `next_agent` claim protocol — currently no way to signal "I'm about to pick this up"; if collaborative workflows appear, add a claim step.
 - Dry-run mode for `hand-off` — print diff of every file it would write, confirm via `clarify` before landing. Useful especially for first Smart Cleanup run on a project.
 - Drift-detection tooling between the two self-contained skills — currently manual (see `DECISIONS.md` 2026-07-17 · adoption of 方案 A).

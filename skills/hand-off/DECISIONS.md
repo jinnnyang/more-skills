@@ -21,7 +21,7 @@
 - Single-file-with-quarterly-archive — YAGNI for MVP; add later if size becomes a real issue.
 
 ### ③ Git commit on hand-off (hand-off specific)
-**Decision:** Private `.hermes/handoff/` is `.gitignore`'d — no commit action. On explicit promote → `docs/handoff/`, always ask via `clarify` (structured choices: leave private / promote+commit / promote+stage-only). If commit chosen, offer editable default message `docs(handoff): <slug> — <status>`.
+**Decision:** Private `<scope>/` is `.gitignore`'d — no commit action. On explicit promote → `docs/handoff/`, always ask via `clarify` (structured choices: leave private / promote+commit / promote+stage-only). If commit chosen, offer editable default message `docs(handoff): <slug> — <status>`.
 **Rationale:** Default (private, no commit) is zero-friction for 90% of sessions. Promote is a user-initiated action, so an interactive commit prompt is appropriate. Structured choices prevent ambiguous free-text answers.
 **Rejected:**
 - Auto-commit on promote — user often wants to bundle with unrelated changes or edit the message.
@@ -56,12 +56,12 @@ Deferred to §13: `project` (implied by cwd), `branch` (needs v2 branch-prefix l
 `last_updated` / `last_verified` **must** include ISO-8601 timezone offset to avoid Windows/Unix parse drift.
 **Rationale:** every frontmatter field is a chance for an agent to hallucinate a value. Fewer fields = fewer failure modes. Fields can be reintroduced when a reader exists.
 
-### R3 · `open-questions.md` vs `task.md` boundary (§4.1) (cross-cutting)
-**Decision:** `open-questions.md` is exclusively for items requiring a **human** answer. Agent-side blockers (waiting on API, build, tool availability) stay in `task.md` with a `[!]` marker.
-**Rationale:** the two were previously ambiguous, causing "blockers" to be dumped into open-questions.md, which then bloated and drifted from actual human decision points.
+### R3 · `questions.md` vs `task.md` boundary (§4.1) (cross-cutting)
+**Decision:** `questions.md` is exclusively for items requiring a **human** answer. Agent-side blockers (waiting on API, build, tool availability) stay in `task.md` with a `[!]` marker.
+**Rationale:** the two were previously ambiguous, causing "blockers" to be dumped into questions.md, which then bloated and drifted from actual human decision points.
 
 ### R4 · Promote semantics = COPY snapshot (§8 Step 4) (hand-off specific)
-**Decision:** Promoting to `docs/handoff/` is a **copy** (not move). `.hermes/handoff/` continues to be the live working set. Files copied into `docs/handoff/` receive `frozen: true` in frontmatter; skills MUST NOT re-touch frozen files. Re-promoting overwrites the frozen copy.
+**Decision:** Promoting to `docs/handoff/` is a **copy** (not move). `<scope>/` continues to be the live working set. Files copied into `docs/handoff/` receive `frozen: true` in frontmatter; skills MUST NOT re-touch frozen files. Re-promoting overwrites the frozen copy.
 **Rationale:** the previous wording was silent on move-vs-copy. Copy is the least surprising ("publish a snapshot") and matches the "leave private working memory intact" mental model.
 
 ---
@@ -75,7 +75,7 @@ Following the comprehensive review of PROTOCOL v0.2, several critical reliabilit
 **Rationale:** Operating at high context usage (>75%) significantly degrades LLM reasoning capabilities. Offloading deterministic logic to Python ensures reliability and keeps the AI cognitive load minimal.
 
 ### ② Atomic Write Protection (cross-cutting)
-**Decision:** All writes to `.hermes/handoff/` and `docs/handoff/` must be atomic: write to a `.tmp` file and rename (POSIX `rename()`) to overwrite the target.
+**Decision:** All writes to `<scope>/` and `docs/handoff/` must be atomic: write to a `.tmp` file and rename (POSIX `rename()`) to overwrite the target.
 **Rationale:** Prevents torn writes/corrupted files if the agent is interrupted or crashes midway through the hand-off process.
 
 ### ③ Metadata-based Tool-Call History Logs (hand-off specific)
@@ -83,11 +83,11 @@ Following the comprehensive review of PROTOCOL v0.2, several critical reliabilit
 **Rationale:** The LLM tool-call history is in-memory and lost across sessions. Recording it in walkthrough metadata allows the next session's `take-over` flow to verify claims without relying on agent memory.
 
 ### ④ Cold-Start (Bootstrap) and Empty State Handling (cross-cutting)
-**Decision:** If `.hermes/handoff/` does not exist during `hand-off`, it is automatically initialized. Bootstrap uses templates from this skill's own `templates/` directory.
+**Decision:** If `<scope>/` does not exist during `hand-off`, it is automatically initialized. Bootstrap uses templates from this skill's own `templates/` directory.
 **Rationale:** Resolves the first-time-use (FTU) user experience gap.
 
 ### ⑥ Unified Frontmatter Kind Enum & Context Append-Only (cross-cutting)
-**Decision:** Frontmatter `kind` is strictly restricted to the enum values: `context`, `task`, `walkthrough`, `open-questions`, `plan`, `review`. `context.md` is strictly additive; corrections are appended at the bottom as dated correction entries.
+**Decision:** Frontmatter `kind` is strictly restricted to the enum values: `context`, `task`, `walkthrough`, `questions`, `plan`, `review`. `context.md` is strictly additive; corrections are appended at the bottom as dated correction entries.
 **Rationale:** Eliminates parser ambiguity and maintains a clean audit trail.
 
 ---
@@ -147,7 +147,7 @@ Second round of design-doc-review findings, focused on the scripts and cleanup s
 **Rationale:** the earlier one-shot mode landed CLEAR/STALE deletions to disk before the user saw the plan, defeating §9a's "err toward UNSURE" intent.
 
 ### R12 · SOFT conflict logging by script, not agent (take-over specific — mirrored here for cross-skill awareness)
-**Decision:** `check-reality --apply-soft-conflicts` writes SOFT conflicts directly into `open-questions.md` under `## Soft Conflicts (Reconciled)`. `take-over` no longer needs to construct that section itself.
+**Decision:** `check-reality --apply-soft-conflicts` writes SOFT conflicts directly into `questions.md` under `## Soft Conflicts (Reconciled)`. `take-over` no longer needs to construct that section itself.
 **Rationale:** consistent with v0.3 ① (script-assisted execution). Removes another surface where the agent could hallucinate the structure.
 
 ### R13 · Serializer double-newline fix (S3) (cross-cutting)
@@ -166,3 +166,36 @@ Second round of design-doc-review findings, focused on the scripts and cleanup s
 **Decision:** SKILL.md invocations use `uv run <path> …` (no `--isolated`).
 **Rationale:** `uv run` is already isolated for scripts declaring inline `# /// script` metadata; passing `--isolated` produces a warning and no additional effect.
 
+
+## Rev-C (v0.5-rev-C · 2026-07-17) — Flat file naming + kind-based scope + question archive
+
+### R17 · Filename prefix `HANDOFF-` retired (cross-cutting)
+**Decision:** Handoff docs use their natural short names — `context.md`, `task.md`, `walkthrough.md`, `questions.md`, `plan.md`, `review.md` — with no `HANDOFF-` prefix. The enclosing directory identifies the scope.
+**Rationale:** User pushback ("为什么每个文件前面都要加一个 HANDOFF ？？？？？... 这几个文件在那个目录就是描述的哪个目录，自解释自包含"). Prefix added no information because the directory is the scope declaration.
+
+### R18 · Kind-based scope discovery (cross-cutting)
+**Decision:** A directory qualifies as a handoff scope only when it contains at least one candidate file (`context.md` / `task.md` / `walkthrough.md` / `questions.md` / `plan.md` / `review.md`) whose YAML frontmatter carries a recognised `kind` value. `_peek_kind()` reads the first 1 KB of each candidate for the classification.
+**Rationale:** Once filename prefix disappeared, filename-only detection would false-positive on any project shipping a generic `context.md` or `task.md`. Kind detection is O(1) per candidate and unambiguous.
+
+### R19 · `open-questions.md` → `questions.md` with `## Open` / `## Closed` sections (cross-cutting)
+**Decision:** The questions doc has two subsections. `## Open` holds active entries; `## Closed` is a permanent archive of resolved entries. Frontmatter `kind` is `questions`.
+**Rationale:** "Open questions" was descriptive but the doc was already accumulating implicitly-closed history in prose. Making Open/Closed explicit removes ambiguity and enables auto-archive.
+
+### R20 · `<!-- resolved -->` archives questions, does not delete (hand-off specific)
+**Decision:** On `clean-up --apply`, question entries under `## Open` bearing `<!-- resolved -->` are **moved** to `## Closed` (retaining full body), not removed. `apply_cleanup` reports the count as `archived_to_closed`. Walkthrough entries with the same marker continue to be deleted (their function is transient session memory, not history).
+**Rationale:** User pick (option A of two): "永久保留，便于历史回顾". Questions carry decision history worth keeping.
+
+### R21 · Scope defined by task range, not directory role (methodological)
+**Decision:** Scope selection is neither "one per skill" nor "always repo root". The agent and user negotiate scope per task based on the task's actual range. `list-scopes` enumerates all live scopes neutrally; no scope is canonical.
+**Rationale:** User pushback ("这一套方法是有明确范围的，取决于我们讨论的范围、处理任务的范围... 说白了，这个是一套方法，不是死板的程序"). Prior wording ("per-skill / repo root default") baked in policy the protocol shouldn't hold.
+**SKILL.md v1.3.0 impact:** Bootstrap Step re-worded to describe scope choice as user-negotiable; example uses no longer imply default location.
+
+### R22 · Rev-B dogfood bugs fixed under rev-C (cross-cutting)
+**Decision:** Two bugs surfaced when v0.4 ate its own dogfood on this repo, fixed as part of rev-C:
+- `write-atomic --content-file /tmp/…` on Windows git-bash now resolves MSYS paths via `resolve_msys_path` on both `--filepath` and `--content-file`.
+- `<session-tools-log>` regex is line-anchored (`re.MULTILINE` + `^` / `$`), so prose mentions of the tag names in walkthrough entries no longer hijack the match.
+**Rationale:** Both bugs blocked the rev-B dogfood test; the fix is straightforward once observed, and the smoke suite now regressions both.
+
+### R23 · `_SECTION_RE` extended to `#{2,3}` (cross-cutting)
+**Decision:** `split_sections` now matches h2 or h3 headers (`^(#{2,3}\s+.*)$`). Walkthrough classification still checks for date-header format (unchanged behaviour). Questions classification uses `hash_count` to distinguish `##` structural headers (Open/Closed) from `###` entry headers.
+**Rationale:** The Open/Closed section design requires two-level headers in `questions.md` (`##` for section, `###` for entry). The old h2-only regex ignored entry-level headers entirely, disabling classification.
