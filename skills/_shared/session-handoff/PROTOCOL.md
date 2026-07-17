@@ -184,9 +184,10 @@ Step 0  Bootstrap Check
         - If `<scope>/` is missing, initialize the directory structure first.
 
 Step 1  Reality check (anti-hallucination)
-        - Offload to `reconcile.py check-history` to compute actual mutations:
-          * `git status --short`             → what's uncommitted?
-          * Scan tool-call execution history from local memory logs.
+        - Offload to `reconcile.py check-reality` to compute actual mutations:
+          * `git status --porcelain`         → what's uncommitted? (PRIMARY EVIDENCE)
+          * `git log -5 --name-only`         → recent commits (PRIMARY EVIDENCE)
+          * Cross-reference walkthrough's optional `<session-tools-log>` block.
           * Diff against what task.md claims is in-progress.
 
 Step 2  Update core docs (Atomic Write Rule: write to `.tmp` first, then rename)
@@ -196,9 +197,9 @@ Step 2  Update core docs (Atomic Write Rule: write to `.tmp` first, then rename)
                * Decisions made & why (rationale)
                * Files changed (paths)
                * Surprises / gotchas discovered
-               * session_id back-reference (if runtime exposes it; else omit)
+               * session_id back-reference
                * NOT a transcript replay — decisions + deltas + surprises only
-               * `<session-tools-log>` metadata: Serialize the list of actual tool calls of this session (tool name, timestamp, simplified input/output metadata).
+               * `<session-tools-log>` metadata: Serialize the list of actual tool calls of this session.
            - PRUNE resolved / obsolete entries per §9a (Smart Cleanup).
            - Target size < 20 KB. If exceeded, tighten pruning; do NOT split into per-session files.
         c) questions.md ← add any blockers found this session.
@@ -211,24 +212,14 @@ Step 3  Update frontmatter
         - Set last_agent, session_id.
         - Set status appropriately (in-progress / blocked / phase-complete).
 
-Step 4  Promote decision (optional; default = private)
-        `<scope>/` is gitignored, so no commit action for private scratch.
-        Ask via AskUserQuestion (clarify) with structured choices:
+Step 4  Commit decision
+        Handoff files live directly in the working tree. Ask via AskUserQuestion (clarify) with structured choices:
           "How to handle this handoff?"
-            - Leave in <scope>/ (private, no commit)
-            - Promote to docs/handoff/ and commit now
-            - Promote to docs/handoff/, stage but don't commit
-        Default: Leave private.
-
-        **Promote semantics = COPY snapshot, not move.**
-        - All file copies to `docs/handoff/` must follow the Atomic Write Rule.
-        - `<scope>/` remains the live working set and keeps evolving.
-        - `docs/handoff/` receives a copy with `frozen: true` added to each
-          file's frontmatter. Skills MUST NOT re-touch frozen files on
-          subsequent runs; they are a historical snapshot for humans / PR review.
-        - To publish a new snapshot later, promote again → overwrites the frozen copy.
-
-        If "commit now" chosen, offer default message
+            - Leave uncommitted (user will commit later)
+            - Commit now with default message
+            - Stage but don't commit
+        
+        If "commit now" chosen, offer default message:
           "docs(handoff): <slug> — <status>"
         and let user edit before running git commit.
 

@@ -79,6 +79,11 @@ Batch operations (`validate`, `check-reality`, `clean-up`) also accept `--all-sc
 
 ## Hand-Off Execution Workflow
 
+> [!IMPORTANT]
+> **交互与工具回退机制 (Choice Tool Fallback Rule):**
+> - 本技能流程多处要求向用户发起结构化提问。如果支持智能体平台的 `AskUserQuestion`（在某些平台中为 `clarify` 或 `ask_question` 工具），请**优先主动调用该工具**来进行选择交互。
+> - 如果您的运行环境中未注册此类结构化提问工具，您**必须**将选项直接以 Markdown 编号列表的形式输出给用户，**并立即中止当前轮次的执行（不继续生成文本、不调用其他工具），让出控制权 (Yield Turn) 以等待用户文本回复编号**，不得私自做出未经用户同意的决策。
+
 All Python invocations use `uv run <SKILL_DIR>/scripts/reconcile.py …` where `<SKILL_DIR>` is the directory of this SKILL.md file. `uv run` is inherently isolated for scripts with inline metadata — do not pass `--isolated`.
 
 ### Step 0: Bootstrap Check
@@ -104,10 +109,10 @@ uv run <SKILL_DIR>/scripts/reconcile.py init --scope <path> --agent "{agent_name
 Before editing documents, audit actual mutations. Do NOT trust memory alone.
 
 ```bash
-uv run <SKILL_DIR>/scripts/reconcile.py check-reality --scope <path>
+uv run <SKILL_DIR>/scripts/reconcile.py check-reality --scope <path> --apply-soft-conflicts --session-id "{session_id}" --agent "{agent_name}"
 ```
 
-The command returns JSON with `hard_conflicts` and `soft_conflicts`. Resolve HARD conflicts before proceeding. Cross-check the current session's real mutations:
+The command returns JSON with `hard_conflicts` and `soft_conflicts`. Resolve HARD conflicts before proceeding. Soft conflicts are automatically appended by the script to `questions.md` as `### Soft conflict · ...` subsections so they are not lost. Cross-check the current session's real mutations:
 
 ```bash
 git status --short
@@ -142,12 +147,13 @@ Update the four core documents:
   - Optionally serialize this session's tool calls as JSON inside the `<session-tools-log>` block. **The tools-log is best-effort auxiliary evidence** — see PROTOCOL §9 note about `git` being primary.
 - **`questions.md`**: two sections. `## Open` for active questions/blockers; `## Closed` for archived history. Mark resolved entries under `## Open` with `<!-- resolved -->` — the next `clean-up --apply` will **move** them to `## Closed` (permanent history, not deletion). Entry format: `### <Question ID> · <title>` at the `###` level under either section.
 - **`context.md`**: append any new critical invariants learned (strictly additive-only).
+  - **Walkthrough-to-Context Promotion Rule:** Prior to running cleanup, review any walkthrough entries that are planned to be pruned (CLEAR or STALE). If an entry contains a long-term architectural decision or project invariant, reformat it and append it to the bottom of `context.md` so the knowledge is preserved.
 
 ### Step 3: Smart Cleanup (two-phase)
 
 **Phase 3a — dry-run classification** (no disk mutation):
 ```bash
-uv run <SKILL_DIR>/scripts/reconcile.py clean-up --scope <path> --dry-run
+uv run <SKILL_DIR>/scripts/reconcile.py clean-up --scope <path> --dry-run --session-id "{session_id}"
 ```
 Returns five buckets: `clear`, `stale`, `kept`, `unsure`, `archived`.
 
@@ -161,7 +167,7 @@ Returns five buckets: `clear`, `stale`, `kept`, `unsure`, `archived`.
 
 **Phase 3b — apply** (only after user confirmation on any UNSURE items):
 ```bash
-uv run <SKILL_DIR>/scripts/reconcile.py clean-up --scope <path> --apply
+uv run <SKILL_DIR>/scripts/reconcile.py clean-up --scope <path> --apply --session-id "{session_id}"
 ```
 Removes CLEAR + STALE walkthrough entries. Moves ARCHIVED question entries from `## Open` to `## Closed` (permanent). UNSURE entries are always preserved. Mirror the JSON audit trail into the Step 5 summary.
 

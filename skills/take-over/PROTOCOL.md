@@ -67,17 +67,19 @@ Four **core** documents (always considered), two **optional** (only when produce
 
 ## 5. Directory Layout
 
-**Flat file layout, no `HANDOFF-` prefix, no `.hermes/handoff/` subdirectory.** Docs live directly in the working scope directory that take-over resumes from:
+Handoff documents live directly in the working scope directory using their natural short names. They are ordinary files in the working tree and are Git-tracked by default:
 
 ```
-<scope>/
-    context.md                       # L1 load
-    task.md                          # L1 load
-    walkthrough.md                   # L3 (do NOT auto-load)
-    questions.md                     # L1 load — includes ## Open + ## Closed
-    plan.md                          # L2 load on demand
-    review.md                        # L2 load on demand
+<scope>/                            # Standard directory in the working tree (Git-tracked)
+    context.md                      # L1 load
+    task.md                         # L1 load
+    walkthrough.md                  # L3 (do NOT auto-load)
+    questions.md                    # L1 load — includes ## Open + ## Closed
+    plan.md                         # L2 load on demand
+    review.md                       # L2 load on demand
 ```
+
+There is no separate `.hermes/handoff/` private scratch directory and no `docs/handoff/` promotion path. Keeping files directly in the working tree ensures simplicity and direct tracking.
 
 **Kind-based scope detection.** A directory qualifies as a scope only when at least one candidate file carries YAML frontmatter with a recognised `kind` value (`context` / `task` / `walkthrough` / `questions` / `plan` / `review`). Prevents take-over from proposing bogus resume targets against arbitrary `context.md` / `task.md` files.
 
@@ -140,13 +142,13 @@ Step 0  Bootstrap Check & Initial Loading
         - Report: "No previous handoff history found. Initialized empty session." and exit take-over flow.
 
 Step 1  Discover
-        - Scan <scope>/ (and docs/handoff/ if present) for the document set.
+        - Scan <scope>/ for the document set.
         - Read only YAML frontmatter of every file first.
         - Determine freshness: last_updated vs `git log -1 --format=%cI`.
 
 Step 2  Reality check (reconciliation)     ← Offloaded to reconcile.py
         - Execute `reconcile.py check-reality --apply-soft-conflicts` to verify:
-          * `git status --short`             → uncommitted changes? (PRIMARY EVIDENCE)
+          * `git status --porcelain`         → uncommitted changes? (PRIMARY EVIDENCE)
           * `git log -5 --name-only`         → recent commit history (PRIMARY EVIDENCE)
           * Optional cross-check: walkthrough's `<session-tools-log>` block is
             AUXILIARY evidence — claims not backed by git are surfaced as SOFT
@@ -157,6 +159,7 @@ Step 2  Reality check (reconciliation)     ← Offloaded to reconcile.py
             `questions.md` under `## Soft Conflicts (Reconciled)`, so
             the take-over agent never rewrites that section itself.
           * Optional: run declared smoke test if fast (< 10s) and specified as REQUIRED in task.md.
+```
 
 Step 3  Layered load
         L1 (always):  context.md + task.md + questions.md

@@ -1,11 +1,11 @@
 ---
 kind: task
 version: 1
-last_updated: 2026-07-17T02:45:00+00:00
-last_verified: 2026-07-17T02:45:00+00:00
-last_agent: hermes-agent-devops
+last_updated: 2026-07-17T03:52:00+00:00
+last_verified: 2026-07-17T03:52:00+00:00
+last_agent: Antigravity
 last_writer: hand-off
-session_id: 2026-07-17-v05-adoption
+session_id: b041c687-73d0-47f4-9d8b-bf878a50422e
 status: in-progress
 ---
 
@@ -28,8 +28,8 @@ Rework of the session-handoff protocol trio (`hand-off` / `take-over` / `_shared
 
 ### Not-done — this session
 
-- [ ] Update `skills/hand-off/SKILL.md` for v0.5-rev-C (short filenames + kind-based scope + Q archive semantics + scope-neutral wording)
-- [ ] Update `skills/take-over/SKILL.md` (same)
+- [x] Update `skills/hand-off/SKILL.md` for v0.5-rev-C (short filenames + kind-based scope + Q archive semantics + scope-neutral wording)
+- [x] Update `skills/take-over/SKILL.md` (same)
 - [ ] Update `skills/hand-off/PROTOCOL.md` (§5 layout: short names + kind detection · §9a: questions archive semantics · §9 evidence rules unchanged)
 - [ ] Update `skills/take-over/PROTOCOL.md` (same)
 - [ ] Append rev-C decision entries to `skills/hand-off/DECISIONS.md` and `skills/take-over/DECISIONS.md`
@@ -40,8 +40,8 @@ Rework of the session-handoff protocol trio (`hand-off` / `take-over` / `_shared
 
 - [ ] D1-D5 · original DEFER items from review cycle 2
 - [ ] Live end-to-end integration test on a non-toy repo
-- [ ] Pre-commit hook enforcing 3-way byte-identical `scripts/reconcile.py` + `templates/*.md` (see questions.md Q2)
-- [ ] Short README per skill (`skills/hand-off/README.md`, `skills/take-over/README.md`) with quickstart
+- [ ] Pre-commit hook enforcing 3-way byte-identical reconcile script + templates (see questions.md Q2)
+- [ ] Short README per skill (hand-off README, take-over README) with quickstart
 
 ## Open Blockers
 

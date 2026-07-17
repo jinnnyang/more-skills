@@ -27,7 +27,7 @@ status: in-progress
 
 <!-- Example entry (delete once real entries land):
 
-## 2026-01-01 — Sample decision <!-- keep -->
+## 2026-01-01 — Sample decision (keep)
 
 - Decision: use pyyaml for frontmatter parsing.
 - Files changed: `scripts/reconcile.py`.

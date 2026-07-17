@@ -1,8 +1,8 @@
 ---
 kind: walkthrough
 version: 1
-last_updated: 2026-07-17T02:45:00+00:00
-last_verified: 2026-07-17T02:45:00+00:00
+last_updated: '2026-07-17T03:52:59+00:00'
+last_verified: 2026-07-17 02:45:00+00:00
 last_agent: hermes-agent-devops
 last_writer: hand-off
 session_id: 2026-07-17-v05-adoption
@@ -60,6 +60,16 @@ status: in-progress
 - `<session-tools-log>` regex is line-anchored (`^<session-tools-log>\s*$` + `re.MULTILINE`) so prose mentions of the tag names in walkthrough decision entries no longer hijack the match.
 
 Both bugs originally caught by the rev-B eat-your-own-dogfood test on this repo.
+
+## 2026-07-17 — review-optimizations <!-- decision -->
+
+**Decision.** Completed a comprehensive expert review (Protocol, Code, and UX expert subagents) of the `hand-off` and `take-over` skills. Applied 10 critical reliability and robustness optimizations to `reconcile.py` and both `SKILL.md` files.
+
+**Rationale.** Expert reviews identified concurrency TOCTOU issues in locking, silent data loss during HTML comment stripping, Git CWD mismatch when executing nested scope checks, relative task path failures, and UX interaction blockages (lack of Yield instructions on fallback questions, plan import task-sync gaps, and lost hand-off soft conflicts).
+
+**Changes implemented.**
+- `reconcile.py` (both skills): implemented atomic exclusive lock creation (`os.O_EXCL`), 2-hour TTL lock expiration, `unlock` CLI command, Git CWD binding, fallback task path resolution, line-based `_peek_kind` parsing, and regex-based multiline title matching.
+- `SKILL.md` (both skills): added proactive calling guidelines for `AskUserQuestion`, yield control turn on fallback questions, stale lock manual override instructions, task synchronization on plan import, and soft conflicts persistence.
 
 ---
 

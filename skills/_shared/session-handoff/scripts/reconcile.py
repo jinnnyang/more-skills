@@ -232,8 +232,59 @@ def write_atomic(filepath: str | os.PathLike[str], content: str) -> None:
     fp = resolve_msys_path(filepath)
     fp.parent.mkdir(parents=True, exist_ok=True)
     tmp = fp.with_suffix(fp.suffix + ".tmp")
-    tmp.write_text(content, encoding="utf-8", newline="\n")
-    os.replace(tmp, fp)
+    try:
+        tmp.write_text(content, encoding="utf-8", newline="\n")
+        os.replace(tmp, fp)
+    finally:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+
+
+# ---------------------------------------------------------------------------
+# Concurrency Lock Helpers
+# ---------------------------------------------------------------------------
+
+
+def check_lock_conflict(scope: Path, session_id: str | None) -> str | None:
+    lock_file = scope / ".handoff.lock"
+    if not lock_file.exists():
+        return None
+    try:
+        data = json.loads(lock_file.read_text(encoding="utf-8"))
+        locked_session = data.get("session_id")
+        if session_id and locked_session == session_id:
+            return None  # Same session, no conflict
+        locked_agent = data.get("agent", "unknown")
+        locked_at = data.get("acquired_at", "unknown")
+        return f"Locked by agent {locked_agent!r} (session: {locked_session!r}) since {locked_at}"
+    except Exception as e:
+        return f"Locked by invalid lock file (error reading: {e})"
+
+
+def write_lock_file(scope: Path, session_id: str | None, agent: str | None) -> None:
+    if not session_id:
+        return
+    lock_file = scope / ".handoff.lock"
+    lock_data = {
+        "session_id": session_id,
+        "agent": agent or "unknown",
+        "acquired_at": datetime.now(timezone.utc).isoformat(timespec="seconds")
+    }
+    write_atomic(lock_file, json.dumps(lock_data, indent=2))
+
+
+def release_lock(scope: Path, session_id: str) -> None:
+    lock_file = scope / ".handoff.lock"
+    if lock_file.exists():
+        try:
+            data = json.loads(lock_file.read_text(encoding="utf-8"))
+            if data.get("session_id") == session_id:
+                lock_file.unlink(missing_ok=True)
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -251,15 +302,28 @@ def git(*args: str) -> tuple[int, str, str]:
         return 127, "", "git not on PATH"
 
 
+def git_repo_root() -> Path | None:
+    rc, out, _ = git("rev-parse", "--show-toplevel")
+    if rc != 0:
+        return None
+    return Path(out.strip()).resolve()
+
+
 def git_status_paths() -> set[str]:
-    rc, out, _ = git("status", "--short")
+    rc, out, _ = git("status", "--porcelain")
     if rc != 0:
         return set()
     paths: set[str] = set()
     for line in out.splitlines():
-        parts = line.strip().split(None, 1)
-        if len(parts) == 2:
-            paths.add(parts[1].replace("\\", "/"))
+        if len(line) < 4:
+            continue
+        path_part = line[3:].strip()
+        if " -> " in path_part:
+            parts = path_part.split(" -> ")
+            target_path = parts[-1].strip('"').replace("\\", "/")
+        else:
+            target_path = path_part.strip('"').replace("\\", "/")
+        paths.add(target_path)
     return paths
 
 
@@ -291,11 +355,17 @@ _FENCE_RE = re.compile(r"```.*?```", re.DOTALL)
 _PATH_TOKEN_RE = re.compile(
     r"""(?:[`"'\(\s]|^)
         (
-          (?:[A-Za-z]:[\\/][^\s`"'\(\)\[\]]+)
+          (?:[A-Za-z]:[\\/][^\s`"'\(\)\[\]]+)  # Windows absolute
           |
-          (?:/[A-Za-z]/[^\s`"'\(\)\[\]]+)
+          (?:/[A-Za-z]/[^\s`"'\(\)\[\]]+)      # MSYS absolute
           |
-          (?:/[^\s`"'\(\)\[\]]+)
+          (?:/[^\s`"'\(\)\[\]]+)                # Unix absolute
+          |
+          (?:\.\.?/[^\s`"'\(\)\[\]]+)            # Relative with ./ or ../
+          |
+          (?:\.\.?\\+[^\s`"'\(\)\[\]]+)          # Relative with Windows backslash
+          |
+          (?:[^\s`"'\(\)\[\]]+(?:[\\/][^\s`"'\(\)\[\]]+)+) # Relative with slashes
         )
     """,
     re.VERBOSE,
@@ -384,15 +454,35 @@ def _is_placeholder(content: str) -> bool:
 
 def split_sections(body: str) -> tuple[str, list[tuple[str, str]]]:
     body = strip_html_comments_preserving_tags(body)
-    parts = _SECTION_RE.split(body)
-    prefix = parts[0]
+    prefix_lines = []
     sections: list[tuple[str, str]] = []
-    i = 1
-    while i < len(parts):
-        header = parts[i]
-        content = parts[i + 1] if i + 1 < len(parts) else ""
-        sections.append((header, content))
-        i += 2
+    
+    in_code_block = False
+    current_header = None
+    current_content_lines = []
+    
+    lines = body.splitlines(keepends=True)
+    for line in lines:
+        if line.strip().startswith("```"):
+            in_code_block = not in_code_block
+            
+        if not in_code_block and (line.startswith("## ") or line.startswith("### ")):
+            if current_header is None:
+                prefix = "".join(prefix_lines)
+            else:
+                sections.append((current_header, "".join(current_content_lines)))
+                current_content_lines = []
+            current_header = line
+        else:
+            if current_header is None:
+                prefix_lines.append(line)
+            else:
+                current_content_lines.append(line)
+                
+    if current_header is not None:
+        sections.append((current_header, "".join(current_content_lines)))
+        
+    prefix = "".join(prefix_lines) if current_header is not None else body
     return prefix, sections
 
 
@@ -529,6 +619,16 @@ def cmd_init(args: argparse.Namespace) -> None:
     session_id = args.session_id or "unknown-session"
     writer = args.writer or "migration"
 
+    lock_err = check_lock_conflict(scope, session_id)
+    if lock_err:
+        print(json.dumps({
+            "status": "error",
+            "message": f"Cannot initialize: {lock_err}"
+        }, indent=2))
+        sys.exit(1)
+
+    write_lock_file(scope, session_id, agent)
+
     initialized: list[str] = []
     skipped: list[str] = []
     missing_templates: list[str] = []
@@ -578,12 +678,25 @@ def _validate_scope(scope: Path) -> dict:
                 warnings.append(f"{doc}: missing (core doc)")
             continue
         try:
-            meta, _ = load_frontmatter(p.read_text(encoding="utf-8"))
+            body_raw = p.read_text(encoding="utf-8")
+            meta, body = load_frontmatter(body_raw)
         except ValueError as e:
             errors.append(f"{doc}: {e}")
             continue
         checked.append(doc)
         errors.extend(validate_meta(meta, doc))
+        
+        # Validate date format in walkthrough.md headers to prevent parsing bugs
+        if doc == "walkthrough.md" and not errors:
+            prefix, sections = split_sections(body)
+            for header, _ in sections:
+                title = header.strip("# \r\n")
+                date_match = _DATE_IN_HEADER_RE.search(header)
+                if not date_match:
+                    warnings.append(
+                        f"walkthrough.md: header {title!r} does not contain "
+                        "valid YYYY-MM-DD date. Will be ignored by clean-up."
+                    )
     return {
         "scope": str(scope),
         "status": "success" if not errors else "invalid",
@@ -598,18 +711,31 @@ def cmd_validate(args: argparse.Namespace) -> None:
     results = [_validate_scope(s) for s in scopes]
     payload = _wrap_batch(results)
     print(json.dumps(payload, indent=2))
-    if any(r.get("errors") for r in results):
+    if any(r.get("status") in {"error", "invalid"} for r in results):
         sys.exit(1)
 
 
-def _check_reality_scope(scope: Path, apply_soft: bool) -> dict:
+def _check_reality_scope(scope: Path, apply_soft: bool, session_id: str | None = None, agent: str | None = None) -> dict:
     if not scope.exists():
         return {"scope": str(scope), "status": "error",
-                "message": f"scope {scope} does not exist"}
+                "message": f"{scope} does not exist"}
 
     hard_conflicts: list[dict] = []
     soft_conflicts: list[dict] = []
+
+    # Concurrency Lock Check
+    lock_err = check_lock_conflict(scope, session_id)
+    if lock_err:
+        hard_conflicts.append({
+            "type": "concurrency_lock_conflict",
+            "message": lock_err,
+        })
+    elif session_id:
+        write_lock_file(scope, session_id, agent)
+
     uncommitted = git_status_paths()
+    repo_root = git_repo_root()
+    is_git = repo_root is not None
 
     for doc in ALL_DOCS:
         p = scope / doc
@@ -652,7 +778,10 @@ def _check_reality_scope(scope: Path, apply_soft: bool) -> dict:
         except ValueError:
             body = ""
         for ref in extract_referenced_paths(body):
-            resolved = normalize_reference_path(ref)
+            if Path(ref).is_absolute():
+                resolved = normalize_reference_path(ref)
+            else:
+                resolved = (scope / ref).resolve()
             if not resolved.exists():
                 hard_conflicts.append({
                     "type": "missing_file_in_task",
@@ -663,11 +792,21 @@ def _check_reality_scope(scope: Path, apply_soft: bool) -> dict:
                 })
 
     wt_path = scope / "walkthrough.md"
+    recent_walkthroughs = []
     if wt_path.exists():
         try:
             _, body = load_frontmatter(wt_path.read_text(encoding="utf-8"))
         except ValueError:
             body = ""
+        # Get walkthrough headers for L1 preview
+        _, sections = split_sections(body)
+        for header, _ in sections:
+            title = header.strip("# \r\n")
+            if title:
+                recent_walkthroughs.append(title)
+                if len(recent_walkthroughs) >= 3:
+                    break
+
         tools_log_match = _TOOLS_LOG_RE.search(body)
         if tools_log_match:
             raw = tools_log_match.group(1).strip()
@@ -680,34 +819,39 @@ def _check_reality_scope(scope: Path, apply_soft: bool) -> dict:
                         "message": f"walkthrough <session-tools-log> not valid JSON: {e}",
                     })
                     tools_log = []
-                recent_committed = git_recent_committed_files(5)
-                cwd = Path.cwd()
-                for call in tools_log:
-                    if not isinstance(call, dict):
-                        continue
-                    tool = call.get("tool")
-                    tgt = call.get("target")
-                    if (tool in {"write_to_file", "write_file", "patch",
-                                 "replace_file_content", "multi_replace_file_content"}
-                            and tgt):
-                        try:
-                            rel = str(Path(tgt).resolve().relative_to(cwd)).replace("\\", "/")
-                        except (ValueError, OSError):
-                            rel = str(tgt).replace("\\", "/")
-                        if rel not in uncommitted and rel not in recent_committed:
-                            soft_conflicts.append({
-                                "type": "tool_call_no_git_evidence",
-                                "message": (
-                                    f"walkthrough claims write to {rel!r} but no git "
-                                    "evidence (not uncommitted, not in last 5 commits)"
-                                ),
-                            })
+                if is_git:
+                    recent_committed = git_recent_committed_files(5)
+                    for call in tools_log:
+                        if not isinstance(call, dict):
+                            continue
+                        tool = call.get("tool")
+                        tgt = call.get("target")
+                        if (tool in {"write_to_file", "write_file", "patch",
+                                     "replace_file_content", "multi_replace_file_content"}
+                                and tgt):
+                            if repo_root:
+                                try:
+                                    abs_tgt = Path(tgt).resolve()
+                                    rel = str(abs_tgt.relative_to(repo_root)).replace("\\", "/")
+                                except (ValueError, OSError):
+                                    rel = str(tgt).replace("\\", "/")
+                            else:
+                                rel = str(tgt).replace("\\", "/")
+                            if rel not in uncommitted and rel not in recent_committed:
+                                soft_conflicts.append({
+                                    "type": "tool_call_no_git_evidence",
+                                    "message": (
+                                        f"walkthrough claims write to {rel!r} but no git "
+                                        "evidence (not uncommitted, not in last 5 commits)"
+                                    ),
+                                })
 
     result: dict = {
         "scope": str(scope),
         "status": "success",
         "hard_conflicts": hard_conflicts,
         "soft_conflicts": soft_conflicts,
+        "recent_walkthroughs": recent_walkthroughs,
     }
     if apply_soft and soft_conflicts:
         result["applied_soft_conflicts"] = apply_soft_conflicts(scope, soft_conflicts)
@@ -716,7 +860,9 @@ def _check_reality_scope(scope: Path, apply_soft: bool) -> dict:
 
 def cmd_check_reality(args: argparse.Namespace) -> None:
     scopes = _collect_scopes(args)
-    results = [_check_reality_scope(s, args.apply_soft_conflicts) for s in scopes]
+    session_id = getattr(args, "session_id", None)
+    agent = getattr(args, "agent", None)
+    results = [_check_reality_scope(s, args.apply_soft_conflicts, session_id, agent) for s in scopes]
     payload = _wrap_batch(results)
     print(json.dumps(payload, indent=2))
 
@@ -872,10 +1018,9 @@ def classify_cleanup(scope: Path) -> dict:
                 kept.append({"file": "questions.md", "header": title,
                              "reason": "placeholder (empty or '- None.')"})
                 continue
-            unsure_items.append({
-                "file": "questions.md", "header": title,
-                "snippet": content.strip().split("\n", 1)[0][:120],
-            })
+            # Keep unresolved open questions by default
+            kept.append({"file": "questions.md", "header": title,
+                         "reason": "active open question"})
 
     return {"clear": removed_clear, "stale": removed_stale,
             "kept": kept, "unsure": unsure_items, "archived": archived}
@@ -899,6 +1044,8 @@ def _rebuild_questions_body(body: str, archived: list[dict], to_remove: set[tupl
     current_top: str | None = None
     has_open_header = False
     has_closed_header = False
+    open_intro = ""
+    closed_intro = ""
 
     for header, content in sections:
         stripped = header.lstrip("#").strip()
@@ -908,8 +1055,10 @@ def _rebuild_questions_body(body: str, archived: list[dict], to_remove: set[tupl
             current_top = stripped.lower()
             if current_top == "open":
                 has_open_header = True
+                open_intro = content
             else:
                 has_closed_header = True
+                closed_intro = content
             continue
         # Under ## Closed — preserve
         if current_top == "closed":
@@ -926,12 +1075,16 @@ def _rebuild_questions_body(body: str, archived: list[dict], to_remove: set[tupl
     # Assemble new body
     parts: list[str] = [prefix]
     parts.append("## Open\n\n" if not has_open_header else "## Open\n\n")
+    if open_intro.strip():
+        parts.append(open_intro.lstrip("\n"))
     for header, content in open_entries:
         parts.append(header)
         parts.append(content)
     if not open_entries:
         parts.append("- None.\n\n")
     parts.append("## Closed\n\n")
+    if closed_intro.strip():
+        parts.append(closed_intro.lstrip("\n"))
     for header, content in closed_entries:
         parts.append(header)
         parts.append(content)
@@ -1004,7 +1157,21 @@ def _clean_up_scope(scope: Path, dry_run: bool) -> dict:
 
 def cmd_clean_up(args: argparse.Namespace) -> None:
     scopes = _collect_scopes(args)
-    results = [_clean_up_scope(s, args.dry_run) for s in scopes]
+    session_id = getattr(args, "session_id", None)
+    results = []
+    for s in scopes:
+        lock_err = check_lock_conflict(s, session_id)
+        if lock_err:
+            results.append({
+                "scope": str(s),
+                "status": "error",
+                "message": f"Lock conflict during clean-up: {lock_err}"
+            })
+            continue
+        res = _clean_up_scope(s, args.dry_run)
+        if not args.dry_run and res.get("status") == "applied" and session_id:
+            release_lock(s, session_id)
+        results.append(res)
     payload = _wrap_batch(results)
     print(json.dumps(payload, indent=2))
 
@@ -1126,6 +1293,8 @@ def main() -> None:
     p_val = sub.add_parser("validate",
                             help="Validate frontmatter across handoff docs")
     _add_scope_args(p_val)
+    p_val.add_argument("--agent", help="Active agent name")
+    p_val.add_argument("--session-id", help="Session ID")
     p_val.set_defaults(func=cmd_validate)
 
     p_check = sub.add_parser("check-reality",
@@ -1136,6 +1305,8 @@ def main() -> None:
         action="store_true",
         help="Also append SOFT conflicts to questions.md",
     )
+    p_check.add_argument("--agent", help="Active agent name")
+    p_check.add_argument("--session-id", help="Session ID")
     p_check.set_defaults(func=cmd_check_reality)
 
     p_clean = sub.add_parser(
@@ -1143,6 +1314,8 @@ def main() -> None:
         help="Classify walkthrough / questions entries (two-phase)",
     )
     _add_scope_args(p_clean)
+    p_clean.add_argument("--agent", help="Active agent name")
+    p_clean.add_argument("--session-id", help="Session ID")
     grp = p_clean.add_mutually_exclusive_group(required=True)
     grp.add_argument("--dry-run", action="store_true",
                       help="Print classification plan JSON, don't mutate")

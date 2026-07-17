@@ -1,8 +1,8 @@
 ---
 kind: questions
 version: 1
-last_updated: 2026-07-17T02:45:00+00:00
-last_verified: 2026-07-17T02:45:00+00:00
+last_updated: '2026-07-17T03:52:59+00:00'
+last_verified: 2026-07-17 02:45:00+00:00
 last_agent: hermes-agent-devops
 last_writer: hand-off
 session_id: 2026-07-17-v05-adoption

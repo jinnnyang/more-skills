@@ -67,21 +67,21 @@ Four **core** documents (always considered), two **optional** (only when produce
 
 ## 5. Directory Layout
 
-**Flat file layout, no `HANDOFF-` prefix, no `.hermes/handoff/` subdirectory.** Docs live directly in the working scope directory:
+Handoff documents live directly in the working scope directory using their natural short names. They are ordinary files in the working tree and are Git-tracked by default:
 
 ```
-<scope>/
-    context.md                       # invariants, additive-only
-    task.md                          # active checklist
-    walkthrough.md                   # single living file, pruned on hand-off (see §9a)
-    questions.md                     # ## Open + ## Closed
-    plan.md                          # optional
-    review.md                        # optional
+<scope>/                            # Standard directory in the working tree (Git-tracked)
+    context.md                      # Invariants, additive-only
+    task.md                         # active checklist
+    walkthrough.md                  # single living file, pruned on hand-off (see §9a)
+    questions.md                    # ## Open + ## Closed
+    plan.md                         # optional
+    review.md                       # optional
 ```
+
+There is no separate `.hermes/handoff/` private scratch directory and no `docs/handoff/` promotion path. Keeping files directly in the working tree ensures simplicity and direct tracking.
 
 **Kind-based scope detection.** A directory qualifies as a scope only when at least one candidate file has YAML frontmatter carrying a recognised `kind` value (`context` / `task` / `walkthrough` / `questions` / `plan` / `review`). This prevents false positives from unrelated generic `context.md` / `task.md` files elsewhere in a project. See §5a for scope resolution.
-
-**Git-tracked by default.** Under v0.5 there is no separate "promote from private scratch" step. Handoff docs are ordinary files in the working tree; the user commits them (or not) through normal git workflow. §8 Step 4 offers commit/stage/skip via `clarify`.
 
 **Why single `walkthrough.md` (not `walkthrough/*.md`):** per DECISIONS ②, walkthrough is *working memory*, not audit log. A single file makes L3 load cost bounded by pruning discipline (§9a) — long-term audit trail already lives in `git log` and `session_search`. Per-session files created a pruning + indexing problem and were explicitly rejected.
 
@@ -139,12 +139,9 @@ Step 0  Bootstrap Check
 
 Step 1  Reality check (anti-hallucination)
         - Offload to `reconcile.py check-reality` to compute actual mutations:
-          * `git status --short`             → what's uncommitted? (PRIMARY EVIDENCE)
+          * `git status --porcelain`         → what's uncommitted? (PRIMARY EVIDENCE)
           * `git log -5 --name-only`         → recent commits (PRIMARY EVIDENCE)
-          * Cross-reference walkthrough's optional `<session-tools-log>` block
-            against git presence — the tools-log is auxiliary, not primary;
-            entries lacking git evidence surface as SOFT conflicts, not
-            claims of correctness.
+          * Cross-reference walkthrough's optional `<session-tools-log>` block.
           * Diff against what task.md claims is in-progress.
 
 Step 2  Update core docs (Atomic Write Rule: write to `.tmp` first, then rename)
@@ -157,23 +154,9 @@ Step 2  Update core docs (Atomic Write Rule: write to `.tmp` first, then rename)
                * Decisions made & why (rationale)
                * Files changed (paths)
                * Surprises / gotchas discovered
-               * session_id back-reference (if runtime exposes it; else omit)
+               * session_id back-reference
                * NOT a transcript replay — decisions + deltas + surprises only
-           - Explicit lifecycle markers (used by §9a Smart Cleanup):
-               * `<!-- keep -->` in the entry body OR any of the keywords
-                 `lesson` / `surprise` / `decision` / `invariant` in the header
-                 → classifier marks entry KEEP.
-               * `<!-- resolved -->` in the entry header or body → CLEAR.
-             Markers are the ONLY way an entry becomes CLEAR by explicit
-             signal; free-text like "we resolved this" is intentionally
-             ignored to prevent false positives.
-           - `<session-tools-log>` block (optional):
-             Serialize this session's tool calls as JSON if the runtime
-             exposes them. Reality-check treats these as AUXILIARY evidence
-             cross-referenced against `git status` + `git log` — the tools-log
-             alone is NOT sufficient to prove a claim (a claim without git
-             evidence surfaces as a SOFT conflict regardless of tools-log
-             content).
+               * `<session-tools-log>` metadata: Serialize the list of actual tool calls of this session.
            - PRUNE resolved / obsolete entries per §9a (Smart Cleanup).
            - Target size < 20 KB. If exceeded, tighten pruning; do NOT split into per-session files.
         c) questions.md ← add any blockers found this session.
@@ -186,24 +169,14 @@ Step 3  Update frontmatter
         - Set last_agent, session_id.
         - Set status appropriately (in-progress / blocked / phase-complete).
 
-Step 4  Promote decision (optional; default = private)
-        `<scope>/` is gitignored, so no commit action for private scratch.
-        Ask via AskUserQuestion (clarify) with structured choices:
+Step 4  Commit decision
+        Handoff files live directly in the working tree. Ask via AskUserQuestion (clarify) with structured choices:
           "How to handle this handoff?"
-            - Leave in <scope>/ (private, no commit)
-            - Promote to docs/handoff/ and commit now
-            - Promote to docs/handoff/, stage but don't commit
-        Default: Leave private.
-
-        **Promote semantics = COPY snapshot, not move.**
-        - All file copies to `docs/handoff/` must follow the Atomic Write Rule.
-        - `<scope>/` remains the live working set and keeps evolving.
-        - `docs/handoff/` receives a copy with `frozen: true` added to each
-          file's frontmatter. Skills MUST NOT re-touch frozen files on
-          subsequent runs; they are a historical snapshot for humans / PR review.
-        - To publish a new snapshot later, promote again → overwrites the frozen copy.
-
-        If "commit now" chosen, offer default message
+            - Leave uncommitted (user will commit later)
+            - Commit now with default message
+            - Stage but don't commit
+        
+        If "commit now" chosen, offer default message:
           "docs(handoff): <slug> — <status>"
         and let user edit before running git commit.
 

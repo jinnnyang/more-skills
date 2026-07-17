@@ -70,6 +70,11 @@ Batch operations (`validate`, `check-reality`, `clean-up`) accept `--all-scopes`
 
 ## Take-Over Execution Workflow
 
+> [!IMPORTANT]
+> **交互与工具回退机制 (Choice Tool Fallback Rule):**
+> - 本技能流程多处要求向用户发起结构化提问。如果支持智能体平台的 `AskUserQuestion`（在某些平台中为 `clarify` 或 `ask_question` 工具），请**优先主动调用该工具**来进行选择交互。
+> - 如果您的运行环境中未注册此类结构化提问工具，您**必须**将选项直接以 Markdown 编号列表的形式输出给用户，**并立即中止当前轮次的执行（不继续生成文本、不调用其他工具），让出控制权 (Yield Turn) 以等待用户文本回复编号**，不得私自做出未经用户同意的决策。
+
 All Python invocations use `uv run <SKILL_DIR>/scripts/reconcile.py …` where `<SKILL_DIR>` is the directory of this SKILL.md file. Do not pass `--isolated`.
 
 ### Step 0: Bootstrap Check — Discover Scopes
@@ -79,7 +84,9 @@ command -v uv && command -v git
 uv run <SKILL_DIR>/scripts/reconcile.py list-scopes
 ```
 
-- **If `list-scopes` finds no scope**, ask the user via `clarify`: initialize a new scope at pwd, initialize at another path, or exit (no prior handoff to resume from).
+- **If `list-scopes` finds no scope:**
+  - If the user explicitly requested to resume work (e.g., "继续", "接着之前的做", "continue"), ask the user via `clarify`: initialize a new scope at pwd, initialize at another path, or exit (no prior handoff to resume from).
+  - If the user's initial prompt was a normal, unrelated instruction, **exit this take-over flow silently** without initializing files or prompting the user, letting you proceed directly to the user's actual request.
 - **If `list-scopes` finds exactly one scope**, use it as `<path>` for subsequent commands.
 - **If `list-scopes` finds multiple scopes**, list them and ask the user via `clarify` which to resume from; pass the choice as `--scope <path>` to every subsequent command.
 
@@ -107,7 +114,7 @@ git log -1 --format=%cI
 
 Offload reconciliation to the helper, appending any SOFT conflicts to `questions.md`:
 ```bash
-uv run <SKILL_DIR>/scripts/reconcile.py check-reality --scope <path> --apply-soft-conflicts
+uv run <SKILL_DIR>/scripts/reconcile.py check-reality --scope <path> --apply-soft-conflicts --session-id "{session_id}" --agent "{agent_name}"
 ```
 
 - Parse the JSON output — `hard_conflicts`, `soft_conflicts`, `applied_soft_conflicts` (count of SOFT entries appended under `## Open` in `questions.md` as `### Soft conflict · …` subsections).
@@ -119,9 +126,9 @@ uv run <SKILL_DIR>/scripts/reconcile.py check-reality --scope <path> --apply-sof
 
 To control context usage:
 
-- **L1 (Always Load)**: `context.md`, `task.md`, `questions.md`.
+- **L1 (Always Load)**: `context.md`, `task.md`, `questions.md`. Note that the `check-reality` command outputs `recent_walkthroughs` (the top 3 headers of `walkthrough.md`). You **MUST** read and display these headers as part of L1 loading so you are aware of the most recent sessions' change topics.
 - **L2 (Load on Demand)**: `plan.md` or `review.md` only when the current task references them (heuristic: if `task.md` body contains the literal string `plan.md` or `review.md`).
-- **L3 (Reference Only — Do NOT Auto-load)**: `walkthrough.md` is a living memory dump. Do not auto-load; only inspect when deep-diving into a specific past decision. `session_search` is often preferable.
+- **L3 (Reference Only — Do NOT Auto-load)**: `walkthrough.md` is a living memory dump. Do not auto-load; only inspect when deep-diving into a specific past decision shown in L1. `session_search` is often preferable.
 
 ### Step 4: Restore Checklist
 
@@ -133,7 +140,9 @@ Parse `task.md`'s open tasks and populate the agent runtime `todo` list.
 
 Handle Step 2 discrepancies per tier (§9b of `PROTOCOL.md`):
 
-- **HARD** (e.g. claimed task done but no Git/code evidence): halt loading. Present via `clarify` with options: *Trust Handoff Docs / Trust Git Reality / User Explains*. Non-interactive fallback: after 5-minute wait, write details to `<scope>/conflict_pending.json` via `write-atomic` and abort.
+- **HARD** (e.g. claimed task done but no Git/code evidence): halt loading. Present via `clarify` with options: *Trust Handoff Docs / Trust Git Reality / User Explains*.
+  - **Concurrency Lock Conflict**: If the hard conflict is a stale lock file (`concurrency_lock_conflict`), prompt the user: "A stale session lock was found. Would you like to force release the lock?" If they agree, run `uv run <SKILL_DIR>/scripts/reconcile.py unlock --scope <path>` to remove it, and restart the take-over process.
+  - **Non-interactive fallback:** In CI/CD or non-interactive environments, do not attempt to wait or pause. Immediately write the conflict details to `<scope>/conflict_pending.json` via `write-atomic` and terminate execution with a descriptive error message.
 - **SOFT** — already logged as `### Soft conflict · …` entries under `## Open` in `questions.md` by Step 2. Nothing more to do here; the summary will report the count. To close a SOFT entry once addressed, mark it with `<!-- resolved -->` — the next `hand-off` will archive it to `## Closed`.
 - **AMBIGUOUS** — the helper escalates these to HARD (fail-safe).
 
@@ -144,7 +153,7 @@ If `.hermes/plans/` exists (plan-mode planning artifacts):
 - Do NOT auto-merge.
 - Prompt the user via `clarify`:
   - *Ignore (default)*: keep plan-mode and handoff scopes independent.
-  - *Import plan.md*: copy plan-mode's `plan.md` to `<scope>/plan.md` (one-shot via `write-atomic`).
+  - *Import plan.md*: copy plan-mode's `plan.md` to `<scope>/plan.md` (one-shot via `write-atomic`). **Task Sync:** If this option is chosen, the agent must read the imported `<scope>/plan.md`, extract any tasks, format them and append them to `<scope>/task.md` using `write-atomic`, and only then re-run Step 4.
   - *Show diff*: compare plan-mode artifacts first.
 
 If import chosen, re-run Step 4 against the updated `task.md`.
@@ -156,6 +165,7 @@ Print a resume greeting:
 Scope: <path>
 Previous agent: {last_agent}. Last verified: {last_verified_timestamp}.
 N soft conflicts logged (see questions.md ## Open § Soft conflict), M hard conflicts resolved.
+[If N <= 3, list the soft conflicts here, e.g. "• ⚠️ last_verified is 10 days old"]
 Done: ...
 Now/Next: ...
 Blocked on: ...

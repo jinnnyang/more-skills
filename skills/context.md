@@ -1,11 +1,11 @@
 ---
 kind: context
 version: 1
-last_updated: 2026-07-17T02:45:00+00:00
-last_verified: 2026-07-17T02:45:00+00:00
-last_agent: hermes-agent-devops
+last_updated: 2026-07-17T03:52:00+00:00
+last_verified: 2026-07-17T03:52:00+00:00
+last_agent: Antigravity
 last_writer: hand-off
-session_id: 2026-07-17-v05-adoption
+session_id: b041c687-73d0-47f4-9d8b-bf878a50422e
 status: in-progress
 ---
 
@@ -60,3 +60,9 @@ Scope is defined by **task range**, not by directory role. Rules of thumb:
 - `skills/_shared/session-handoff/` — development snapshot (v0.3 frozen protocol, current script + templates as SSOT for the byte-identical sync).
 - `skill_view name=design-doc-review` — review methodology.
 - `skill_view name=hermes-agent` — Hermes Agent CLI/config reference.
+
+## Invariants Added on 2026-07-17 — review-optimizations
+
+13. **Atomic Lock and TTL Expiration.** Locks are acquired exclusively (`os.O_EXCL`) and have a 2-hour TTL expiration. Stale locks can be broken manually using `reconcile.py unlock`.
+14. **Yield Turn on Choice Fallbacks.** Choice interactions require agents to yield control (Yield Turn) in single-turn environments when tool-based options are unavailable.
+15. **Plan tasks sync.** Plan imports require task list extraction and synchronization into `task.md`.
