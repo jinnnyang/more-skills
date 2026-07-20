@@ -1,12 +1,12 @@
 ---
 kind: walkthrough
 version: 1
-last_updated: '2026-07-20T09:35:00+00:00'
-last_verified: '2026-07-20T09:35:00+00:00'
+last_updated: '2026-07-20T09:43:30+00:00'
+last_verified: '2026-07-20T09:43:30+00:00'
 last_agent: Hermes Agent (ark-code-latest)
-last_writer: hand-off
+last_writer: take-over
 session_id: sess-20260720-takeover-lock-lifecycle-bug
-status: in-progress
+status: phase-complete
 ---
 
 # Living Work Memory & Walkthrough
@@ -93,6 +93,35 @@ Author (Hermes Agent) recommends **B**. It fixes the class of bug, not the insta
 
 ---
 
+## 2026-07-20 (rev-B) — Fix landed (bug, decision, invariant)
+
+**Outcome:** option B shipped as planned. Two commits on branch `more`:
+
+- `7b0441d` — take-over: `--acquire-lock` opt-in, ADR R35, SKILL.md callout, version 1.4.0 → 1.5.0, 7 regression tests.
+- `096275f` — hand-off: parity (`_prepare_scope` passes `acquire=True` internally), CLI flag, 9 regression tests.
+
+**Verification:** 42 pytest pass across both skills (take-over 7, hand-off 35) + e2e dogfood that reproduces the exact 2026-07-20 make-soul failure sequence and now succeeds cleanly. Ad-hoc verify script written and cleaned up.
+
+**Decisions locked:**
+
+- Q1 → divergent-by-design; two `reconcile.py` copies kept independent, same fix applied twice. (ADR R36.)
+- Q2 → opt-in default (`--acquire-lock`). No known external callers; safer default wins. (ADR R35.)
+- Q3 → TTL stays flat 7200 s for both read and write. The failure mode was the acquire, not the check.
+
+**Surprises during landing:**
+
+- `_prepare_scope` is a strict superset of `_check_reality_scope` + cleanup planning — the parity fix in hand-off was as simple as flipping one keyword arg (`acquire=True`) at the single call site. The bug had a much bigger blast-radius in *description* than in *code*.
+- The pytest scaffold hand-off already carried (`test_reconcile.py` with `SourceFileLoader` module load) made adding a sibling `test_lock_lifecycle.py` trivial. This is why R21's decision to keep pure-logic pytest coverage paid off here — closing a P2 gap took 15 minutes, not 2 hours.
+
+**Follow-ups (see task.md § Next):**
+
+- Audit other implicit-acquire spots (only `cmd_init` remaining, expected to write — but worth a grep pass).
+- Real end-to-end run over a wall-clock time gap, not the in-process dogfood.
+
+<!-- resolved -->
+
 <session-tools-log>
 []
 </session-tools-log>
+
+---

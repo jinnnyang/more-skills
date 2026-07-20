@@ -1,12 +1,12 @@
 ---
 kind: context
 version: 1
-last_updated: 2026-07-20T09:35:00+00:00
-last_verified: 2026-07-20T09:35:00+00:00
+last_updated: 2026-07-20T09:43:30+00:00
+last_verified: 2026-07-20T09:43:30+00:00
 last_agent: Hermes Agent (ark-code-latest)
-last_writer: hand-off
+last_writer: take-over
 session_id: sess-20260720-takeover-lock-lifecycle-bug
-status: in-progress
+status: phase-complete
 ---
 
 # Project Invariants & Context
@@ -45,4 +45,6 @@ status: in-progress
 
 ## Invariant Corrections Log
 
-- None.
+- **2026-07-20 (rev-B)** — Invariant on line 35 ("`--session-id` presence toggles acquire vs check") is **superseded** by the new contract: `check-reality` acquires **only** when `--acquire-lock` is passed. `--session-id` alone is now purely identity metadata, not a mode switch. Landed in commits `7b0441d` (take-over) and `096275f` (hand-off), documented in `DECISIONS.md` R35 / R36. The original line stays above as historical record of the bug's shape.
+- **2026-07-20 (rev-B)** — Invariant on line 36 ("`release_lock` is only called from `cmd_clean_up`") still holds *literally*, but the acquire side is now gated by explicit opt-in, so the leak surface it warned about is closed. No behavioural change to `release_lock` itself.
+- **2026-07-20 (rev-B)** — `skills/take-over/scripts/reconcile.py` md5 changed (new fix). `skills/hand-off/scripts/reconcile.py` md5 also changed (parity fix). Q1 in `questions.md` answered: divergence is intentional; both files carry the same lock semantics but are physically independent copies. No plan to unify.
