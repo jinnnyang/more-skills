@@ -736,7 +736,8 @@ def cmd_validate(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
-def _check_reality_scope(scope: Path, apply_soft: bool, session_id: str | None = None, agent: str | None = None) -> dict:
+def _check_reality_scope(scope: Path, apply_soft: bool, session_id: str | None = None,
+                         agent: str | None = None, acquire: bool = False) -> dict:
     if not scope.exists():
         return {"scope": str(scope), "status": "error",
                 "message": f"{scope} does not exist"}
@@ -745,7 +746,16 @@ def _check_reality_scope(scope: Path, apply_soft: bool, session_id: str | None =
     soft_conflicts: list[dict] = []
 
     # Concurrency Lock Check
-    if session_id:
+    #
+    # Historical bug (2026-07-20): passing --session-id was silently promoting
+    # this read-only preflight into a write op (acquire_lock). See take-over's
+    # DECISIONS.md ADR R35 / R36 for the full history.
+    #
+    # Semantics now: acquire only when the caller opts in (acquire=True /
+    # --acquire-lock). hand-off's _prepare_scope passes acquire=True because
+    # it *is* the intending-to-write caller; ad-hoc CLI users of
+    # `check-reality` get read-only behaviour by default.
+    if acquire and session_id:
         lock_err = acquire_lock(scope, session_id, agent)
     else:
         lock_err = check_lock_conflict(scope, session_id)
@@ -850,7 +860,8 @@ def cmd_check_reality(args: argparse.Namespace) -> None:
     scopes = _collect_scopes(args)
     session_id = getattr(args, "session_id", None)
     agent = getattr(args, "agent", None)
-    results = [_check_reality_scope(s, args.apply_soft_conflicts, session_id, agent) for s in scopes]
+    acquire = bool(getattr(args, "acquire_lock", False))
+    results = [_check_reality_scope(s, args.apply_soft_conflicts, session_id, agent, acquire=acquire) for s in scopes]
     payload = _wrap_batch(results)
     print(json.dumps(payload, indent=2))
     if any(r.get("hard_conflicts") or r.get("status") == "error" for r in results):
@@ -1428,7 +1439,7 @@ def _prepare_scope(scope: Path, apply_soft: bool, session_id: str | None,
             "message": f"scope {scope} does not exist",
         }
 
-    reality = _check_reality_scope(scope, apply_soft, session_id, agent)
+    reality = _check_reality_scope(scope, apply_soft, session_id, agent, acquire=True)
     hard_conflicts = reality.get("hard_conflicts", [])
     health = _analyze_multihop_health(scope, reality)
 
@@ -1666,6 +1677,16 @@ def main() -> None:
     )
     p_check.add_argument("--agent", help="Active agent name")
     p_check.add_argument("--session-id", help="Session ID")
+    p_check.add_argument(
+        "--acquire-lock",
+        action="store_true",
+        help=(
+            "Opt in to acquiring .handoff.lock during this check. Without this "
+            "flag check-reality is strictly read-only regardless of --session-id. "
+            "hand-off's `prepare` sets acquire=True internally; ad-hoc callers "
+            "should generally NOT pass the flag."
+        ),
+    )
     p_check.set_defaults(func=cmd_check_reality)
 
     p_clean = sub.add_parser(
