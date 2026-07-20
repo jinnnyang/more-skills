@@ -315,41 +315,43 @@ Each step in SKILL.md's workflow references the applicable file(s) so the agent 
 Batch of changes captured in `REVIEW-2026-07-20.md`; landed across four commits (`4784816` → `73cc957` → `f305eda` → `83869aa`).
 
 ### R16 · SKILL.md first-screen ergonomics (cross-cutting)
-- Added `## Mental Model (90 seconds)` block: three-action flow (`prepare → write → clean-up`) + `next_action` decision table.
-- Added `## Happy Path (safe_to_apply branch)` copy-pasteable command block.
-- Reason: a fresh agent used to have to load `references/next-actions.md` + `PROTOCOL.md §11a` before it could parse Step 1's output. Now the branch enum is self-explaining from SKILL.md alone; references still hold the detailed contracts.
+
+Added a `## Mental Model (90 seconds)` block with the three-action flow (`prepare → write → clean-up`) and the `next_action` decision table, plus a `## Happy Path (safe_to_apply branch)` copy-pasteable command block. Before this, a fresh agent had to load `references/next-actions.md` and `PROTOCOL.md §11a` just to parse what Step 1's JSON was telling it. Now the branch enum is self-explaining from SKILL.md alone; the detailed contracts still live in references.
 
 ### R17 · Terminology sweep — external `rev-*` / `v0.x` labels removed (cross-cutting)
-- SKILL.md `version: 1.4.0` (semver) is now the only external version knob.
-- All `rev-A/B/C/F` and `v0.5-*` references stripped from SKILL.md, PROTOCOL.md, references/*, and reconcile.py docstrings.
-- DECISIONS.md keeps its internal `rev-*` labels (this file is the chronological log; those labels are its lingua franca and never leak out).
-- Reason: rev labels here have no coherent global meaning — `rev-F` in §11a is unrelated to `rev-2` in the R-series above. Someone reading `## 11a. Multi-Hop Trust Health (rev-F · 2026-07-17)` three months later has no way to decode "rev-F is the 6th revision *of this section*, unrelated to SKILL.md v1.4.0". Internal build state should not leak into user-facing docs.
+
+SKILL.md's `version: 1.4.0` (semver) is now the only external version knob. All `rev-A/B/C/F` and `v0.5-*` references were stripped from SKILL.md, PROTOCOL.md, references/*, and reconcile.py docstrings. DECISIONS.md keeps its internal `rev-*` labels — this file is the chronological log, and those labels are its lingua franca. They never leak out.
+
+Why: the rev labels didn't have a coherent global meaning. `rev-F` in §11a is unrelated to `rev-2` in the R-series above. Someone reading `## 11a. Multi-Hop Trust Health (rev-F · 2026-07-17)` three months later would have no way to know "rev-F is the 6th revision *of this section*, unrelated to SKILL.md v1.4.0". Internal build state shouldn't leak into user-facing docs.
 
 ### R18 · references/clarify-templates.md added (hand-off specific)
-- New reference file with concrete `clarify(question, choices)` shapes for every branch (`halt` × 3 patterns, `challenge_required` × 2 shapes, `clarify_unsure` × 2 modes, Git decision × 2 variants) + a §5 anti-patterns list.
-- Cross-linked from SKILL.md `## Interaction Rule` and `references/next-actions.md`.
-- Reason: prior docs said "batched clarify with structured choices" without showing the JSON shape, letting different sessions invent divergent UIs. Standardising here keeps UX consistent across agents and models.
+
+New reference file with concrete `clarify(question, choices)` shapes for every branch: three patterns for `halt`, two shapes for `challenge_required`, two modes for `clarify_unsure`, two variants for the Git decision, plus a §5 anti-patterns list. Cross-linked from SKILL.md `## Interaction Rule` and `references/next-actions.md`.
+
+Prior docs said "batched clarify with structured choices" without showing the JSON shape, and different sessions were inventing divergent UIs as a result. Standardising the call shape here keeps the UX consistent across agents and models.
 
 ### R19 · reconcile.py pytest suite (cross-cutting)
-- `scripts/tests/test_reconcile.py` — 26 tests covering `classify_cleanup` (12), `_rebuild_questions_body` (5), `_analyze_multihop_health` (9).
-- Module loaded via `SourceFileLoader` because reconcile.py's PEP-723 `# /// script` header trips normal `import`.
-- Git dependencies stubbed via autouse `_isolate_git` fixture — no `git init` required, suite runs in < 0.5 s on Windows.
-- Reason: reconcile.py encodes the most consequential product decisions (five-bucket cleanup, health thresholds, Open→Closed archive semantics). Any future refactor risks silently breaking these. Tests establish a safety net before we touch the internals.
-- Explicitly not covered: `_prepare_scope`/`cmd_prepare` composite output (needs a real git repo fixture — deferred until a regression forces it).
+
+`scripts/tests/test_reconcile.py` — 26 tests covering `classify_cleanup` (12), `_rebuild_questions_body` (5), and `_analyze_multihop_health` (9). The module is loaded via `SourceFileLoader` because reconcile.py's PEP-723 `# /// script` header trips normal `import`. Git dependencies are stubbed through an autouse `_isolate_git` fixture, so no `git init` is required and the suite runs in under half a second on Windows.
+
+Reconcile.py encodes the most consequential product decisions this skill has: the five-bucket cleanup classifier, the health thresholds, and the Open → Closed archive semantics. A future refactor could silently break any of these. Landing tests before any of that happens is the safety net.
+
+Explicitly not covered: the `_prepare_scope` / `cmd_prepare` composite output, because that path needs a real git-repo fixture. Deferred until a regression forces it.
 
 ### R20 · `.gitattributes` LF normalisation (repo-level, cross-cutting)
-- Added at repo root: `*.md text eol=lf` + friends for `*.py` / `*.yml` / `*.json` / `*.toml`.
-- Reason: silences repeated `warning: in the working copy ... CRLF will be replaced by LF` on Windows commits; also stabilises hash comparisons across platforms.
+
+Added at the repo root: `*.md text eol=lf` and the same for `*.py` / `*.yml` / `*.json` / `*.toml`. This silences the repeated `warning: in the working copy ... CRLF will be replaced by LF` message on Windows commits, and it also stabilises hash comparisons across platforms.
 
 ### R21 · When-to-Run trigger set (hand-off specific)
-- Restored "context window feels tight" as a soft trigger (was silently dropped in v1.4.0 due to no reliable runtime signal for context usage).
-- Kept: explicit `"先到这"` / `"换你上"` / `"handoff"` / `/handoff` and "major todo phase completes".
-- Reason: agents *can* self-assess when their state is at risk even without a hard percentage signal — losing that intent left the trigger set too narrow.
+
+Restored "context window feels tight" as a soft trigger — it was silently dropped in v1.4.0 because there's no reliable runtime signal for actual context usage. Kept the explicit triggers (`"先到这"` / `"换你上"` / `"handoff"` / `/handoff`) and "major todo phase completes".
+
+Agents *can* self-assess when their state is at risk even without a hard percentage signal. Losing that intent had left the trigger set too narrow, and users had to remember to say "handoff" out loud instead of the agent noticing.
 
 
 ## Empirical Calibration Log (Multi-Hop Trust Health)
 
-`_analyze_multihop_health` uses four thresholds that were chosen a-priori before any real usage. This log records **every observed `challenge_required` trigger in the wild** so we can revisit the thresholds when we have data.
+`_analyze_multihop_health` uses four thresholds that were chosen a-priori, before any real usage. This log records **every observed `challenge_required` trigger in the wild** so we can revisit the thresholds once we have data.
 
 **Current thresholds (hypotheses, v1.4.0 / 2026-07-20):**
 - `inferred_pct ≥ 40` (with `hop_count ≥ 3`) → hallucination-cascade issue
@@ -359,7 +361,7 @@ Batch of changes captured in `REVIEW-2026-07-20.md`; landed across four commits 
 - Verdict: 0 issues → `healthy`, 1 → `warning`, ≥ 2 → `unhealthy` → `challenge_required`
 
 **Target trigger distribution** (goal, not enforceable):
-- We *want* `challenge_required` to fire on roughly the top 10-20 % of long-lived scopes. If it fires on every 3rd hand-off in every project, users will train themselves to click through and the mechanism dies. If it never fires, it's dead code that inflates the review surface for no benefit.
+- We *want* `challenge_required` to fire on roughly the top 10–20 % of long-lived scopes. If it fires on every third hand-off in every project, users will train themselves to click through and the mechanism dies. If it never fires, it's dead code inflating the review surface for no benefit.
 
 ### How to record a real trigger
 
@@ -367,12 +369,12 @@ When `prepare` returns `next_action = "challenge_required"` on a real project, a
 
 - **Date** (ISO date of the hand-off)
 - **Project + branch** (or scope path if not in a repo)
-- **`hop_count`** and **`inferred_pct`** / **`untagged_pct`** / **`stale_invariants_count`** / **`soft_conflicts`** at trigger
+- **`hop_count`** and **`inferred_pct`** / **`untagged_pct`** / **`stale_invariants_count`** / **`soft_conflicts`** at trigger time
 - **`inferred_samples`** — how many samples `prepare` surfaced (≤ 3 today)
 - **User response** — for each surfaced sample: kept as-is / promoted to `[user:*]` / deleted / rewritten
-- **False-positive?** — subjective flag; true if the user felt the trigger wasn't warranted
+- **False-positive?** — subjective flag, true if the user felt the trigger wasn't warranted
 
-Manual for now — no `prepare`-side auto-logging because `prepare` must stay read-only (adding a filesystem side-effect would break its atomic-preflight contract). If this log accumulates > 5 entries and we still want auto-recording, add a `--calibration-log <path>` opt-in flag to `prepare` at that point (not before).
+Manual for now. `prepare` stays read-only (a filesystem side-effect would break its atomic-preflight contract). Once this log accumulates more than five entries and we still want auto-recording, add a `--calibration-log <path>` opt-in flag to `prepare` at that point, not before.
 
 ### Log entries
 
