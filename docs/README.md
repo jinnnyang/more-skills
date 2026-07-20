@@ -12,6 +12,7 @@
 |---|---|---|---|
 | [`hermes-agent-self-maintenance.md`](./hermes-agent-self-maintenance.md) | Hermes Agent 的"技能自维护"机制：五层架构、完整闭环、设计权衡、横向对比 | ~47KB · 12章 + 2附录 | 2026-07-20 首版 |
 | [`adr-decision-records.md`](./adr-decision-records.md) | ADR 与 DECISIONS.md 决策日志：概念起源、格式对比、Supersedes 机制、反模式与实操 | ~49KB · 13章 + 5附录 | 2026-07-20 首版（源自 `skills/take-over/references/adr-and-decisions.md`） |
+| [`what-is-a-soul.md`](./what-is-a-soul.md) | SOUL.md 的概念本质：六层人格 stack、行为先验模型、可覆盖性、三条写作规则、六种反模式 | ~38KB · 12章 + 3附录 | 2026-07-20 首版（源自 `skills/make-soul` 使用中的概念性问答） |
 
 ---
 
@@ -23,11 +24,17 @@
 2. 再读 [`adr-decision-records.md`](./adr-decision-records.md) 的 Ch 1 → Ch 4 → Ch 8。理解决策留痕的具体做法。
 3. 最后读两份的收尾章（自维护 Ch 11-12 / ADR Ch 12-13），把它们连成完整方法论。
 
+**如果你在写 agent 人格**（用 `skills/make-soul` 或类似方法）：
+
+1. 直接读 [`what-is-a-soul.md`](./what-is-a-soul.md) 的 Ch 5（分层模型）→ Ch 8（三条写作规则）→ Ch 9（六种反模式）。这三章覆盖 80% 的实操需要。
+2. 有余力再读 Ch 3（先验视角）和 Ch 7（可覆盖性），理解**为什么**规则是这样。
+
 **如果你想把这套方法用到自己项目**：
 
 - 只需要 skill 库自维护 → 只看 `hermes-agent-self-maintenance.md`。
 - 只需要决策日志 → 只看 `adr-decision-records.md`。
-- 想两个都用 → 顺序无所谓，两份互相引用。
+- 需要写 agent 人格 → 看 `what-is-a-soul.md` + `skills/make-soul/`。
+- 全都用 → 三份互相引用，顺序无所谓。
 
 **如果你是 AI agent 接手本仓库**：
 
@@ -44,7 +51,8 @@ more-skills/
 ├── docs/                       # 你在这里 · 跨 skill 学习文档
 │   ├── README.md               # 本文件
 │   ├── hermes-agent-self-maintenance.md
-│   └── adr-decision-records.md
+│   ├── adr-decision-records.md
+│   └── what-is-a-soul.md
 ├── skills/
 │   ├── take-over/
 │   │   ├── SKILL.md            # take-over skill 主入口
@@ -53,6 +61,10 @@ more-skills/
 │   │   └── references/
 │   │       └── adr-and-decisions.md   # 本 docs/ 里 ADR 文档的源材料
 │   ├── hand-off/               # take-over 的姊妹 skill
+│   ├── make-soul/
+│   │   ├── SKILL.md            # SOUL.md 作者 skill
+│   │   └── references/
+│   │       └── what-is-a-soul.md      # 本 docs/ 里 SOUL 文档的精简对应
 │   └── ...                     # 其他 skill
 └── ...
 ```
@@ -71,6 +83,7 @@ more-skills/
 
 - **`hermes-agent-self-maintenance.md`** — 若过时或有误，按其 Ch 11 阶段 3 的方法 patch。
 - **`adr-decision-records.md`** — 若过时或有误，按其 Ch 7 的 Supersedes 机制追加修订，不就地重写。
+- **`what-is-a-soul.md`** — 若过时或有误，按其文末的追加式修订原则处理；若与 `skills/make-soul` 演化脱节，同步两边。
 
 新文档追加时，更新本 README 的表格。
 
