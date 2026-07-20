@@ -248,7 +248,7 @@ Second round of design-doc-review findings, focused on the scripts and take-over
 
 ## 2026-07-20 — Acceptance Review + FTU polish (v1.4.0)
 
-Driven by the first real dogfood run of take-over (see the调用记录-20260720.md report). All decisions land in this single revision because they share the same entry point (SKILL.md's Step 0 / bootstrap) and reworking them separately would churn the same passage repeatedly.
+Driven by the first real dogfood run of take-over (see the `REVIEW-2026-07-20-dogfood.md` report — originally filed as `调用记录-20260720.md`, renamed 2026-07-20 R34). All decisions land in this single revision because they share the same entry point (SKILL.md's Step 0 / bootstrap) and reworking them separately would churn the same passage repeatedly.
 
 ### R24 · Handoff Acceptance Review (take-over specific — new Step 1.5)
 **Decision:** New `reconcile.py review-handoff` subcommand + new SKILL.md Step 1.5. Before Step 2 (reality check), take-over verifies the previous session's docs are actually *usable*:
@@ -282,7 +282,7 @@ Verdict is `pass | reject | fresh_init`. `reject` blocks Step 2 and offers three
 ### R26 · Yield-Turn Fallback Protocol (§0a) formalised (cross-cutting behavioural spec)
 **Decision:** The "no `clarify` tool → numbered-list yield" fallback is now a top-level §0a section with 5 explicit rules: preamble ≤ 3 lines, no tokens after the list, legal numeric reply is authoritative (no re-confirm), illegal reply loops, and the "no tool" state must be confirmed by search rather than guessed.
 
-**Rationale:** the previous single-paragraph `[!IMPORTANT]` block left three concrete ambiguities (see 调用记录-20260720.md § "clarify 回退协议"). Different agents behaved inconsistently — some re-confirmed after a numeric reply, some kept generating explanations after the list.
+**Rationale:** the previous single-paragraph `[!IMPORTANT]` block left three concrete ambiguities (see `REVIEW-2026-07-20-dogfood.md` § "clarify 回退协议"). Different agents behaved inconsistently — some re-confirmed after a numeric reply, some kept generating explanations after the list.
 
 **Rejected:** leaving the rules per-branch inline — same 5 rules repeat at 5+ branch points, duplication is worse than a single hoisted section.
 
@@ -306,7 +306,7 @@ Verdict is `pass | reject | fresh_init`. `reject` blocks Step 2 and offers three
 ### R29 · Windows / MSYS path convention documented
 **Decision:** SKILL.md Prerequisites gains a "Path convention on Windows / MSYS" subsection stating that `uv run <path>` requires a native `C:\...` path, not `/c/...`. The script itself internally accepts both via `resolve_msys_path`, but the path handed to `uv run` bypasses that translation.
 
-**Rationale:** the hand-off skill hit this bug immediately after v0.5 rollout on Windows (see 调用记录-20260720.md § "Windows 路径 shell 语法陷阱"). Documenting once at the top costs less than agents re-deriving the fix per session.
+**Rationale:** the hand-off skill hit this bug immediately after v0.5 rollout on Windows (see `REVIEW-2026-07-20-dogfood.md` § "Windows 路径 shell 语法陷阱"). Documenting once at the top costs less than agents re-deriving the fix per session.
 
 ### R30 · Frontmatter enum knowledge propagation
 **Decision:** New file `references/frontmatter-fields.md` documents `kind` / `status` / `last_writer` enums + timestamp format. Templates now include a top-of-file `<!-- Frontmatter enums ... -->` comment listing valid values. SKILL.md init-branch greeting explicitly names the `status` enum.
@@ -356,6 +356,18 @@ Additionally added a **§Version conventions** table to `DECISIONS.md` Meta sect
 - Auto-derive the protocol version from git tags — no tags yet, and this repo is a skill collection not a release train.
 
 **Impact:** Any future ADR cross-references become unambiguous. `SKILL.md § Overview`'s "(v0.5, flat-file layout)" phrasing now agrees with `PROTOCOL.md` top header. Skill semver stays at `1.4.0`; may bump to `1.4.1` at review-cycle close-out per the new §Version conventions rule.
+
+### R34 · Preserve dogfood report as `REVIEW-2026-07-20-dogfood.md` (bookkeeping)
+**Decision:** The 108-line Chinese dogfood report that motivated the R24–R31 batch (originally landed as `调用记录-20260720.md`, untracked) was renamed to `REVIEW-2026-07-20-dogfood.md` and committed. Added a short English header explaining its role and relationship to the sibling `REVIEW-2026-07-20.md` (later `skill-review-cycle` pass). Chinese body preserved verbatim; not translated. All three call sites in `DECISIONS.md` R24-header / R26 / R29 updated to point at the new filename.
+
+**Rationale:** The dogfood report is the only artifact tying R24–R31 to concrete user-observed pain (Windows path bug, clarify-fallback ambiguities, empty seed on init). Left untracked, one `git clean` erases the receipts and the R24–R31 rationale becomes ungrounded. `references/adr-and-decisions.md` §6.5 explicitly warns against ADRs whose evidence lives outside the repo.
+
+**Rejected:**
+- Extract findings into `references/dogfood-lessons.md` short-form and delete the original — loses the primary source; the distilled version would just be prose rewriting of R24–R31 which the ADRs already carry.
+- Delete outright — same problem plus permanently loses the specific numeric/example callouts (e.g. the "list-scopes → JSON output structure" observation) that the ADRs cite abstractly.
+- Translate to English — the original captures the reporter's voice (刘工) and technical vocabulary; translation risks distortion for zero benefit.
+
+**Impact:** No behavioural change. Future reviewers can trace R24–R31 back to the first-hand observation. Filename now sorts next to `REVIEW-2026-07-20.md` in `ls`, making the two-report structure discoverable.
 
 ---
 
