@@ -383,3 +383,50 @@ Skill semver stays at **1.4.0** — no user-observable behaviour changed, only p
 
 ---
 
+## 2026-07-20 (rev-C) — Lock lifecycle contract: `check-reality` is read-only by default
+
+### R35 · `--acquire-lock` flag on `check-reality` (take-over specific; hand-off mirrored)
+
+**Supersedes:** the implicit contract in R7 / earlier lock code that `_check_reality_scope` acquires `.handoff.lock` whenever `--session-id` is present. No prior ADR names this behaviour explicitly, but the reconcile.py branch at lines 754-757 encoded it since lock introduction. This ADR retires that branch shape.
+
+**Decision:** `reconcile.py check-reality` now takes an optional `--acquire-lock` flag. Semantics:
+
+- **Flag absent (default)** → strictly read-only. `check_lock_conflict` is called; `.handoff.lock` is never written, regardless of whether `--session-id` was supplied. Existing locks are still detected and surface as HARD `concurrency_lock_conflict`.
+- **Flag present** → old behaviour. `acquire_lock` is called; a `.handoff.lock` matching the session-id is written iff no conflicting lock exists.
+
+Corresponding SKILL.md change: Step 2 · Reality Check gets an `IMPORTANT` callout instructing take-over **never** to pass `--acquire-lock`. hand-off's `prepare` (which composes check-reality + cleanup planning) is the intended caller of the opt-in path.
+
+Companion regression tests land at `skills/take-over/scripts/tests/test_lock_lifecycle.py` (7 cases: default-no-write, opt-in-writes, existing-lock-still-detected, same-session-reacquire-noop, CLI parser exposes flag, CLI default-no-write end-to-end, CLI opt-in-writes end-to-end).
+
+**Rationale:** The 2026-07-20 make-soul session hit HARD `concurrency_lock_conflict` on hand-off because the take-over that opened the same shell session had silently acquired a lock during its Step 2 · Reality Check (`--session-id` present → implicit `acquire_lock`) and never released it. `release_lock` is only invoked from `cmd_clean_up`, which is a hand-off-only command; take-over has no code path that releases what it took. The lock leaked until the 7200s TTL expired, ambushing hand-off ~74 minutes later.
+
+The root failure is a naming/lifecycle contract mismatch: `_check_reality_scope`'s name promises a read; its body performed a write conditional on an argument (`--session-id`) that every take-over call always supplies. Options considered were the three ranked in `walkthrough.md § 2026-07-20 § Fix landscape`:
+
+- **A · Doc-only fix** — add an `unlock` step at end of take-over Step 7. Rejected: fragile against mid-flow abort; leaves the surprising branch shape in code where the next reader will re-trip it.
+- **B · Read-only preflight flag** — this decision. Cost: ~1 hour (code + tests + ADR + doc). Fixes the class, not the instance.
+- **C · Context-manager lock** — `with acquired_lock(...)` scoped around callers. Rejected: `check-reality`'s natural shape doesn't want to acquire at all, so wrapping the acquire in a scope doesn't fit the caller.
+
+Answering Q2 (opt-in vs opt-out default) from `questions.md`: **opt-in default** was chosen. No known external callers rely on the old implicit-acquire, the "safe by default" convention argues for reads to be reads, and the flag name makes caller intent explicit. Q1 (parity with hand-off) is answered in a paired R36 landing note below. Q3 (read-side TTL) is left at status quo — read-only checks continue to honour the 7200s TTL, because the failure mode is the acquire, not the check.
+
+**Rejected:**
+- Rename `_check_reality_scope` to `_check_or_acquire_reality_scope` — a naming clarity fix without a semantic fix would still leave every take-over caller silently acquiring. The flag is load-bearing.
+- Default the flag to `True` for backward compatibility — perpetuates the exact surprising default that caused the bug and forces every read-only caller to remember `--no-acquire-lock`. Rust/Python "safe by default" wins.
+- Make take-over release its own lock at end of Step 7 (option A) as well as landing the flag — belt-and-braces sounds good but if the flag is enforced by SKILL.md guidance, the belt is enough; adding a redundant release path adds a new class of bug (release-during-abort races).
+- Extend `check_lock_conflict` to also honour a "self-lock-is-ok" fast path so take-over's lock wouldn't conflict with its own later reads — misidentifies the problem. The problem is the *existence* of the lock past take-over's exit, not the conflict semantics.
+
+**Impact:** Behaviour change is user-visible for anyone driving `reconcile.py check-reality --session-id …` outside the two skills. In-repo callers are (a) take-over's SKILL.md Step 2 — now safe as-is, (b) hand-off's `_prepare_scope` — see R36 for parity work. External callers (if any) that relied on the side-effect must add `--acquire-lock`. Skill semver bumps 1.4.0 → **1.5.0** (contract change on a public helper command).
+
+### R36 · Parity with hand-off's `reconcile.py`
+
+**Decision:** Answering `questions.md` Q1 — the two `reconcile.py` copies are **kept independent** (their md5 hashes diverged before this bug), and the same fix is applied twice with matching semantics. hand-off's `_prepare_scope` will pass the flag internally (it *is* the "intending to write" caller), so hand-off users see no CLI change; but `skills/hand-off/scripts/reconcile.py` gets the same `--acquire-lock` flag on its `check-reality` subcommand for parity, and hand-off's `prepare` invokes `_check_reality_scope` with `acquire=True`.
+
+**Rationale:** Unifying the two files into a shared source is a bigger refactor (touches skill packaging, install layout, both templates), out of scope for a lock-lifecycle bugfix. Divergent-by-design is the current de-facto state; making the fix land in both preserves that state without escalating. The parity work + a shared regression test lives under `skills/hand-off/scripts/tests/`, mirroring the take-over side.
+
+**Rejected:**
+- Unify the two copies into `skills/_shared/reconcile.py` — retired by R14 (2026-07-17 "Adopted 方案 A: self-contained skill directories"); reversing that under a bugfix would be scope creep.
+- Land the fix only in take-over — bug's symptom appears in hand-off's `prepare`; if `prepare` still runs its inner check-reality with the old semantics, the class of leak persists.
+
+**Impact:** hand-off `check-reality` CLI gains the same opt-in flag (no default behaviour change for hand-off's own workflows because `prepare` passes it internally). Regression coverage duplicated to hand-off's test suite.
+
+---
+

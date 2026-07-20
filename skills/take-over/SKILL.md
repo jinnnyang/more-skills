@@ -2,7 +2,7 @@
 name: take-over
 description: |
   Pick up where the previous session stopped, without amnesia. Loads the handoff docs left by the companion `hand-off` skill, checks they're actually usable (acceptance review), cross-checks what they claim against `git status` / `git log`, and restores the todo list. Triggers on "接着之前的做" / "continue previous work" / "resume", or when the skill is auto-loaded and a handoff scope already exists at pwd.
-version: 1.4.0
+version: 1.5.0
 author: 刘工 + Hermes Agent
 license: MIT
 metadata:
@@ -248,6 +248,9 @@ Offload reconciliation to the helper, appending any SOFT conflicts to `questions
 ```bash
 uv run <SKILL_DIR>/scripts/reconcile.py check-reality --scope <path> --apply-soft-conflicts --session-id "<session_id>" --agent "<agent_name>"
 ```
+
+> [!IMPORTANT]
+> Do **NOT** pass `--acquire-lock`. take-over's Step 2 is a read-only preflight; it must not write `.handoff.lock`. Acquiring here without a paired release leaks the lock past take-over's exit and later ambushes hand-off with a HARD `concurrency_lock_conflict`. See `DECISIONS.md` ADR "check-reality is read-only by default" (2026-07-20).
 
 - Parse the JSON output — `hard_conflicts`, `soft_conflicts`, `applied_soft_conflicts` (count of SOFT entries appended under `## Open` in `questions.md` as `### Soft conflict · …` subsections).
 - Handling per §9b of `PROTOCOL.md`:
