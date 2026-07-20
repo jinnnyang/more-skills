@@ -1,12 +1,12 @@
 # `clarify` Templates for hand-off Branches
 
-> Loaded when the agent needs to talk to the user during a hand-off. Every user-facing decision goes through Hermes' `clarify` tool (AskUserQuestion equivalent) — never through free-text messages that ask for a choice. This document standardises the shape of each call so different sessions produce a consistent UX.
+> Loaded when the agent needs to talk to the user during a hand-off. Every user-facing decision goes through Hermes' `clarify` tool (the AskUserQuestion equivalent) rather than a free-text message that asks for a choice. Standardising the call shape here means different sessions and different agents produce a consistent UX, and users learn what a "hand-off clarify" is going to feel like.
 >
 > `clarify(question, choices)` takes:
-> - `question`: **the question only** — do NOT enumerate options in the string.
+> - `question`: the question, and only the question. Don't enumerate the options inside the string — they belong in `choices`.
 > - `choices`: up to 4 entries. A 5th "Other (type your answer)" option is auto-appended.
 >
-> The templates below are Python-ish pseudocode; adapt to the actual tool schema of the runtime you're on.
+> The templates below are Python-ish pseudocode. Adapt to the actual tool schema of the runtime you're on.
 
 ## Priority-order cheat sheet
 
@@ -243,10 +243,10 @@ clarify(
 
 ---
 
-## §5. Anti-patterns (do not do these)
+## §5. Anti-patterns (things not to do)
 
-1. **Enumerating options inside `question`** and passing empty `choices`. The Hermes UI can only render selectable rows from `choices`. Options in the question body become dead prose.
-2. **Batching unrelated decisions into one clarify.** "Should I release the lock AND commit now AND drop these UNSURE items?" is unreadable. One decision per call.
-3. **Free-text questions when structured choices exist.** If the answer space is finite and known, always use `choices`.
-4. **Auto-answering on the user's behalf** because "the safe choice is obvious". If it's truly obvious, skip the clarify entirely and just state what you'll do. If it needs a decision, the user makes it — not you.
-5. **Skipping the re-run of `prepare` after resolving a HALT or CHALLENGE.** Reality may have changed; you can't assume the branch has moved without re-checking.
+1. **Enumerating options inside `question` and passing empty `choices`.** Hermes' UI can only render selectable rows out of `choices`. Options written into the question text become dead prose — the user reads them but can't click them.
+2. **Batching unrelated decisions into one clarify.** "Should I release the lock, commit now, and drop these UNSURE items?" is unreadable, and the user can't answer half of it. One decision per call.
+3. **Free-text prompts when the answer space is finite and known.** If you can list the choices ahead of time, list them. Ask via `choices` rather than "please reply with A, B, or C".
+4. **Auto-answering on the user's behalf.** If the safe choice really is obvious, skip the clarify and just tell the user what you're about to do. If it needs a decision, the user makes it — not you. That includes the honest cases: "still valid" on a `challenge_required` item, "don't stage" on the Git question — these are decisions, and you don't get to answer them silently just because the odds look good.
+5. **Skipping the re-run of `prepare` after resolving a HALT or CHALLENGE.** Reality may have shifted underneath you while the user was answering. Re-run `prepare` and let the branch move on its own, or find out it hasn't.
