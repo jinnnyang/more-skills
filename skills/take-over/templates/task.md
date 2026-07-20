@@ -9,10 +9,26 @@ session_id: {{SESSION_ID}}
 status: in-progress
 ---
 
+<!--
+Frontmatter enums (see references/frontmatter-fields.md for full details):
+  kind         : context | task | walkthrough | questions | plan | review
+  status       : in-progress | blocked | phase-complete | archived   (NOT 'complete')
+  last_writer  : hand-off | take-over | user | migration
+
+Checklist marker legend:
+  `[ ]`  todo         `[/]`  in-progress
+  `[x]`  done         `[!]`  agent-side blocker (waiting on tool/build, NOT a human question)
+
+Human-answered blockers live in questions.md, not here.
+-->
+
 # Current Tasks
 
-- `[ ]` Define your task list here
-- `[/]` In-progress tasks
-- `[x]` Completed tasks
+## Now
+<!-- The first item under Now is what the next agent picks up. -->
 
-> [!] Marks blockers or agent-side issues (not human blockers).
+## Next
+<!-- Ordered list of what to do after Now. -->
+
+## Done
+<!-- Move completed items here to keep an audit trail; hand-off may prune later. -->

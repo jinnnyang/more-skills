@@ -1213,6 +1213,358 @@ def cmd_clean_up(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
+# ---------------------------------------------------------------------------
+# Handoff Acceptance Review (review-handoff)
+# ---------------------------------------------------------------------------
+#
+# Goal: decide whether the handoff docs at <scope> are actually usable by a
+# taking-over agent BEFORE any body content is loaded into runtime context.
+# Prevents take-over from silently accepting empty/hallucinated/self-contradictory
+# handoff artifacts and burning context on garbage.
+#
+# Severity levels:
+#   REJECT   — hard blocker; scope is not usable as-is. Take-over must either
+#              refuse and bounce back to the previous session, or run a
+#              remediation pass.
+#   WARN     — proceed-with-caution; surfaced to the user but not blocking.
+#   INFO     — informational (e.g. fresh_init detection).
+
+# Template placeholder / seeded-content markers we treat as "not yet populated".
+_TEMPLATE_TOKEN_RE = re.compile(
+    r"\{\{\s*(TIMESTAMP|AGENT|WRITER|SESSION_ID)\s*\}\}"
+)
+
+_CONTEXT_PLACEHOLDER_LINES = {
+    "brief overview:",
+    "- brief overview:",
+    "key architectural rules:",
+    "- key architectural rules:",
+    "env variables:",
+    "- env variables:",
+    "build/test commands:",
+    "- build/test commands:",
+}
+
+_TASK_PLACEHOLDER_SNIPPETS = (
+    "define your task list here",
+    "in-progress tasks",
+    "completed tasks",
+)
+
+
+def _iter_task_checklist_items(body: str) -> list[tuple[str, str]]:
+    """Return (marker, text) for every `- [x]`/`- [/]`/`- [ ]`/`- [!]` line."""
+    items: list[tuple[str, str]] = []
+    for line in body.splitlines():
+        m = re.match(r"^\s*[-*]\s*`?\[([ x/!])\]`?\s*(.*)$", line)
+        if m:
+            items.append((m.group(1), m.group(2).strip()))
+    return items
+
+
+def _context_description_populated(body: str) -> bool:
+    """Return True iff context.md has a non-placeholder Project Description."""
+    prefix, sections = split_sections(body)
+    for header, content in sections:
+        title = header.strip("# \r\n").lower()
+        if "project description" not in title:
+            continue
+        stripped_lines = [ln.strip() for ln in content.splitlines() if ln.strip()]
+        if not stripped_lines:
+            return False
+        for ln in stripped_lines:
+            ln_norm = ln.rstrip(":").strip().lower()
+            # Skip template lines like `- Brief overview:` (trailing colon,
+            # nothing after it).
+            if ln_norm in _CONTEXT_PLACEHOLDER_LINES:
+                continue
+            if re.match(r"^[-*]\s*[a-z ]+:\s*$", ln.lower()):
+                # bullet with only a label + colon, no content
+                continue
+            # Any non-placeholder content wins.
+            return True
+        return False
+    return False
+
+
+def _task_has_real_items(body: str) -> bool:
+    """Return True iff task.md contains at least one non-template checklist item."""
+    items = _iter_task_checklist_items(body)
+    for _marker, text in items:
+        text_l = text.lower()
+        if not text_l:
+            continue
+        if any(snippet in text_l for snippet in _TASK_PLACEHOLDER_SNIPPETS):
+            continue
+        return True
+    return False
+
+
+def _cross_ref_targets(body: str) -> set[str]:
+    """Extract references to plan.md / review.md from a doc body."""
+    refs: set[str] = set()
+    stripped = strip_code_fences(body)
+    for name in ("plan.md", "review.md"):
+        # look for either bare filename or scope-relative reference
+        if re.search(rf"\b{name}\b", stripped):
+            refs.add(name)
+    return refs
+
+
+def _review_scope(scope: Path, allow_fresh: bool = False) -> dict:
+    """Run acceptance review on a scope; return structured verdict.
+
+    Verdict schema::
+
+        {
+          "scope": "<path>",
+          "status": "pass" | "reject" | "fresh_init",
+          "issues": [
+            {
+              "severity": "REJECT" | "WARN" | "INFO",
+              "kind": "<machine-readable tag>",
+              "file": "<filename or empty>",
+              "detail": "<human-readable description>",
+              "suggestion": "<what remediation could do>"
+            }, ...
+          ],
+          "docs_present": [...],
+          "docs_missing": [...],
+        }
+    """
+    issues: list[dict] = []
+
+    if not scope.exists():
+        return {
+            "scope": str(scope),
+            "status": "reject",
+            "issues": [{
+                "severity": "REJECT",
+                "kind": "scope_missing",
+                "file": "",
+                "detail": f"{scope} does not exist",
+                "suggestion": "Run `reconcile.py init --scope <path>` first.",
+            }],
+            "docs_present": [],
+            "docs_missing": list(DEFAULT_DOCS),
+        }
+
+    docs_present: list[str] = []
+    docs_missing: list[str] = []
+    doc_meta: dict[str, dict] = {}
+    doc_body: dict[str, str] = {}
+
+    for doc in DEFAULT_DOCS:
+        p = scope / doc
+        if not p.exists():
+            docs_missing.append(doc)
+            continue
+        docs_present.append(doc)
+        try:
+            meta, body = load_frontmatter(p.read_text(encoding="utf-8"))
+            doc_meta[doc] = meta
+            doc_body[doc] = body
+        except ValueError as e:
+            issues.append({
+                "severity": "REJECT",
+                "kind": "frontmatter_parse_error",
+                "file": doc,
+                "detail": f"frontmatter parse error: {e}",
+                "suggestion": "Fix or regenerate the file; see references/frontmatter-fields.md.",
+            })
+            continue
+
+    for doc in docs_missing:
+        issues.append({
+            "severity": "REJECT",
+            "kind": "core_doc_missing",
+            "file": doc,
+            "detail": f"core doc {doc} is missing from scope",
+            "suggestion": f"Run `reconcile.py init --scope {scope}` to seed defaults.",
+        })
+
+    # Frontmatter validity (defensive; take-over Step 1 also runs validate).
+    for doc, meta in doc_meta.items():
+        for err in validate_meta(meta, doc):
+            issues.append({
+                "severity": "REJECT",
+                "kind": "frontmatter_invalid",
+                "file": doc,
+                "detail": err,
+                "suggestion": "See references/frontmatter-fields.md for valid enum values.",
+            })
+
+    # Template-token leftovers (raw content, not just frontmatter).
+    for doc in docs_present:
+        try:
+            raw = (scope / doc).read_text(encoding="utf-8")
+        except OSError:
+            continue
+        leftover = _TEMPLATE_TOKEN_RE.findall(raw)
+        if leftover:
+            issues.append({
+                "severity": "REJECT",
+                "kind": "template_tokens_unfilled",
+                "file": doc,
+                "detail": (
+                    f"unfilled template tokens found: "
+                    f"{sorted(set(leftover))!r}"
+                ),
+                "suggestion": (
+                    "Re-run init with proper --agent / --session-id, "
+                    "or hand-edit the tokens with real values."
+                ),
+            })
+
+    # last_writer sanity: all-migration => fresh init (INFO/WARN depending on flag).
+    writers = {doc: (m.get("last_writer") or "") for doc, m in doc_meta.items()}
+    all_migration = (
+        bool(doc_meta) and all(w == "migration" for w in writers.values())
+    )
+    if all_migration:
+        issues.append({
+            "severity": "INFO" if allow_fresh else "REJECT",
+            "kind": "fresh_init_only",
+            "file": "",
+            "detail": (
+                "every core doc has last_writer=migration — the scope was "
+                "only initialized from templates, never actually handed off."
+            ),
+            "suggestion": (
+                "If this is a first-time bootstrap, pass --allow-fresh to "
+                "acknowledge and proceed. Otherwise the previous session "
+                "should re-run hand-off before take-over is meaningful."
+            ),
+        })
+
+    # context.md Project Description populated?
+    if "context.md" in doc_body:
+        if not _context_description_populated(doc_body["context.md"]):
+            issues.append({
+                "severity": "REJECT",
+                "kind": "context_description_empty",
+                "file": "context.md",
+                "detail": (
+                    "context.md § 'Project Description' contains only "
+                    "template placeholders (`Brief overview:` etc.) or is empty."
+                ),
+                "suggestion": (
+                    "Fill in what this project actually is — a one-paragraph "
+                    "overview of goals, current stage, and any invariants the "
+                    "next agent must respect."
+                ),
+            })
+
+    # task.md has real items?
+    if "task.md" in doc_body:
+        if not _task_has_real_items(doc_body["task.md"]):
+            issues.append({
+                "severity": "REJECT",
+                "kind": "task_list_empty",
+                "file": "task.md",
+                "detail": (
+                    "task.md contains no actionable checklist item — only "
+                    "template placeholders remain."
+                ),
+                "suggestion": (
+                    "Populate at least one concrete `- [ ]` or `- [/]` item "
+                    "the next agent should pick up."
+                ),
+            })
+
+    # Cross-reference integrity: task.md / context.md refer to plan.md / review.md?
+    for src_doc in ("task.md", "context.md"):
+        if src_doc not in doc_body:
+            continue
+        for ref in _cross_ref_targets(doc_body[src_doc]):
+            target = scope / ref
+            if not target.exists():
+                issues.append({
+                    "severity": "REJECT",
+                    "kind": "cross_reference_missing",
+                    "file": src_doc,
+                    "detail": (
+                        f"{src_doc} references {ref!r} but "
+                        f"{target} does not exist."
+                    ),
+                    "suggestion": (
+                        f"Either create {ref} at the scope root or remove "
+                        f"the reference from {src_doc}."
+                    ),
+                })
+            elif target.stat().st_size == 0:
+                issues.append({
+                    "severity": "WARN",
+                    "kind": "cross_reference_empty",
+                    "file": src_doc,
+                    "detail": (
+                        f"{src_doc} references {ref!r} but the file is empty."
+                    ),
+                    "suggestion": f"Populate {ref} or drop the reference.",
+                })
+
+    # Description-code consistency (conservative): path-looking tokens in
+    # context.md must resolve either under scope or under git repo root.
+    # HTML comments are stripped first so example paths inside `<!-- ... -->`
+    # don't trigger false positives.
+    if "context.md" in doc_body:
+        repo_root = git_repo_root(cwd=scope)
+        body = _HTML_COMMENT_RE.sub("", doc_body["context.md"])
+        for ref in extract_referenced_paths(body):
+            # Skip absolute paths (may be example paths on another machine)
+            # and URL-ish tokens — extract_referenced_paths already filtered
+            # denylisted prefixes.
+            if Path(ref).is_absolute():
+                # We can't verify absolute paths across machines; skip.
+                continue
+            candidate = (scope / ref).resolve()
+            found = candidate.exists()
+            if not found and repo_root is not None:
+                found = (repo_root / ref).resolve().exists()
+            if not found:
+                issues.append({
+                    "severity": "WARN",
+                    "kind": "context_path_not_found",
+                    "file": "context.md",
+                    "detail": (
+                        f"context.md mentions {ref!r} but neither "
+                        f"{candidate} nor a repo-root sibling exists."
+                    ),
+                    "suggestion": (
+                        "If the path is a live invariant, correct it. "
+                        "If it's illustrative, put it inside a code fence "
+                        "so acceptance review ignores it."
+                    ),
+                })
+
+    # Aggregate verdict.
+    has_reject = any(i["severity"] == "REJECT" for i in issues)
+    if has_reject:
+        status = "reject"
+    elif all_migration and allow_fresh:
+        status = "fresh_init"
+    else:
+        status = "pass"
+
+    return {
+        "scope": str(scope),
+        "status": status,
+        "issues": issues,
+        "docs_present": docs_present,
+        "docs_missing": docs_missing,
+    }
+
+
+def cmd_review_handoff(args: argparse.Namespace) -> None:
+    scopes = _collect_scopes(args)
+    allow_fresh = bool(getattr(args, "allow_fresh", False))
+    results = [_review_scope(s, allow_fresh=allow_fresh) for s in scopes]
+    payload = _wrap_batch(results)
+    print(json.dumps(payload, indent=2))
+    if any(r.get("status") == "reject" for r in results):
+        sys.exit(1)
+
+
 def cmd_unlock(args: argparse.Namespace) -> None:
     scope = resolve_scope(args.scope)
     lock_file = scope / ".handoff.lock"
@@ -1361,6 +1713,25 @@ def main() -> None:
     p_check.add_argument("--agent", help="Active agent name")
     p_check.add_argument("--session-id", help="Session ID")
     p_check.set_defaults(func=cmd_check_reality)
+
+    p_review = sub.add_parser(
+        "review-handoff",
+        help=(
+            "Acceptance review: is <scope> actually usable by a taking-over "
+            "agent? Checks template residue, empty descriptions, empty task "
+            "lists, cross-reference integrity, description-code consistency."
+        ),
+    )
+    _add_scope_args(p_review)
+    p_review.add_argument(
+        "--allow-fresh",
+        action="store_true",
+        help=(
+            "Treat 'all docs still last_writer=migration' as INFO instead of "
+            "REJECT — for first-time bootstrap right after init."
+        ),
+    )
+    p_review.set_defaults(func=cmd_review_handoff)
 
     p_clean = sub.add_parser(
         "clean-up",

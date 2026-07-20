@@ -6,6 +6,30 @@
 
 ---
 
+## Meta · Why this skill maintains an ADR log
+
+`DECISIONS.md` is an **Architecture Decision Record (ADR) log** — the same discipline used in long-lived open-source projects (Kubernetes, Rust, Apache) transplanted to a single skill. See `references/adr-and-decisions.md` for the full principles + practices reference.
+
+Three reasons this particular skill needs it more than most:
+
+1. **The design surface is subtle and easy to re-litigate.** Every field in the frontmatter, every step in the take-over flow, every conflict tier was chosen against 2–4 alternatives with real trade-offs. Without a written record, the next author (human or agent) will inevitably propose "why not just ..." for options that were already rejected months ago, wasting context on rediscovery.
+
+2. **The two peer skills (`take-over` / `hand-off`) share protocol semantics but not files** (see 2026-07-17 · self-contained decision). Drift between them is a real risk. The DECISIONS log is the primary artifact that prevents silent divergence — a decision tagged *(cross-cutting)* must land in both skills' logs verbatim.
+
+3. **Agents editing agents amplify hallucination risk.** An LLM asked to "modify take-over" without seeing prior rationale will confidently rewrite invariants that were carefully chosen. Making rejected alternatives explicit is cheap immunization: the agent sees "we tried X, here's why it broke" before it re-proposes X.
+
+### Editing rules (enforced by convention, not tooling)
+
+- **Never rewrite a past entry.** Corrections/supersessions add a new dated entry that names the entry it replaces (`Supersedes: 2026-07-16 ①`).
+- **Cross-cutting decisions must appear in both skills' logs** with identical `Decision` / `Rationale` text (Rejected alternatives may vary if one side has extra concerns).
+- **Every entry must include Rejected Alternatives** — a decision without alternatives is a description, not a decision. If genuinely no alternatives were considered, say so explicitly (rare, and a signal to think harder).
+- **Consult before changing anything referenced by an entry's decision id.** Section titles like "④ Take-over conflict handling" carry stable ids exactly so `SKILL.md` and `PROTOCOL.md` can reference them.
+- **When in doubt whether a change deserves an entry**: if a reviewer would ask "why is it this way instead of the obvious alternative?", write the entry.
+
+See `references/adr-and-decisions.md` for the full playbook — when to write an entry, entry anatomy, common failure modes, and worked examples from this skill's own history.
+
+---
+
 ## 2026-07-16 — Initial Design Decisions
 
 ### ① Document format (cross-cutting)
@@ -198,3 +222,82 @@ Second round of design-doc-review findings, focused on the scripts and take-over
 ### R23 · `_SECTION_RE` extended to `#{2,3}` (cross-cutting)
 **Decision (mirrored):** Section splitting now covers h2 + h3 so questions' `### <ID> · <title>` entries are classifiable.
 **Take-over impact:** none direct — take-over does not classify; only load. `apply_soft_conflicts` gains ability to append `### Soft conflict …` entries cleanly under `## Open`.
+
+---
+
+## 2026-07-20 — Acceptance Review + FTU polish (v1.4.0)
+
+Driven by the first real dogfood run of take-over (see the调用记录-20260720.md report). All decisions land in this single revision because they share the same entry point (SKILL.md's Step 0 / bootstrap) and reworking them separately would churn the same passage repeatedly.
+
+### R24 · Handoff Acceptance Review (take-over specific — new Step 1.5)
+**Decision:** New `reconcile.py review-handoff` subcommand + new SKILL.md Step 1.5. Before Step 2 (reality check), take-over verifies the previous session's docs are actually *usable*:
+- template-token residue (`{{TIMESTAMP}}` etc.)
+- `context.md § Project Description` non-placeholder
+- `task.md` has at least one non-template checklist item
+- cross-references (`plan.md` / `review.md`) resolve
+- `context.md` path-looking tokens exist under scope or repo root (WARN)
+- all-migration writers → REJECT (unless `--allow-fresh`)
+
+Verdict is `pass | reject | fresh_init`. `reject` blocks Step 2 and offers three options via §0a: **Reject** (exit, bounce back to previous session), **Remediate** (take-over fixes issues in place, up to 3 passes), **Force continue** (log overrides to `questions.md § Open`).
+
+**Rationale:** the previous flow blindly accepted whatever hand-off left behind. If hand-off produced empty or self-contradictory docs, take-over would burn context on nothing and the user would only notice after the summary. The review is a pure static check (no test execution) so its cost is bounded.
+
+**Severity calibration:** slightly-stricter-than-conservative — empty descriptions and empty task lists are REJECT (not WARN) because they defeat the entire purpose of hand-off; description-code path mismatches are WARN (not REJECT) because absolute or illustrative paths produce too many false positives in practice.
+
+**Remediation scope allowed:** take-over may write to `context.md § Project Description` (originally template stub, therefore not violating additive-only) and `task.md § Now`. It must not rewrite `walkthrough.md`, must not touch `## Closed` in `questions.md`, and must not silently invent content for `plan.md` / `review.md` cross-references (those escalate back to the user).
+
+**Rejected alternatives:**
+- Only warn, never reject — leaves the "empty seed passed off as real handoff" bug unfixable.
+- Reject-only (no remediation branch) — forces every low-signal fix into a full hand-off round trip; too heavy for FTU.
+- Merge with existing `validate` — different concern (validate = frontmatter syntax; review-handoff = body semantics + cross-doc integrity). Keeping them separate makes CLI failure modes legible.
+
+### R25 · Initial Context Seeding (take-over specific — new Step 0.5)
+**Decision:** After `init` on the empty-scope branch, take-over MUST seed `context.md § Project Description` and `task.md § Now` from the user's triggering message before greeting. Runs `review-handoff --allow-fresh` afterward to confirm the seed passes acceptance review.
+
+**Rationale:** previously, `init` produced 4 skeleton files and greeted the user, leaving the actual context for the *next* hand-off to write. In practice the very first user message contains everything needed — Project Description + first task — and skipping the seed means the first hand-off has no material to hand off. New agents on the receiving end then had nothing to take over.
+
+**Rejected:** relying on the agent's own judgement to seed after greeting — this depends on how proactive the specific agent is. Making it a documented step levels the floor.
+
+### R26 · Yield-Turn Fallback Protocol (§0a) formalised (cross-cutting behavioural spec)
+**Decision:** The "no `clarify` tool → numbered-list yield" fallback is now a top-level §0a section with 5 explicit rules: preamble ≤ 3 lines, no tokens after the list, legal numeric reply is authoritative (no re-confirm), illegal reply loops, and the "no tool" state must be confirmed by search rather than guessed.
+
+**Rationale:** the previous single-paragraph `[!IMPORTANT]` block left three concrete ambiguities (see 调用记录-20260720.md § "clarify 回退协议"). Different agents behaved inconsistently — some re-confirmed after a numeric reply, some kept generating explanations after the list.
+
+**Rejected:** leaving the rules per-branch inline — same 5 rules repeat at 5+ branch points, duplication is worse than a single hoisted section.
+
+### R27 · Explicit "when to run take-over" trigger list
+**Decision:** SKILL.md now names the three triggering conditions explicitly: skill-invocation marker, Chinese/English resume keywords, or auto-load + non-empty scope discovered. Absence of all three → silent exit in Step 0.
+
+**Rationale:** the previous "if the user's initial prompt was a normal, unrelated instruction, exit silently" left the judgement to the agent's intuition. Different runtimes (some invoke take-over via hook, some via user typing) produced different behaviours.
+
+**Rejected:** universal auto-run — too invasive; universal opt-in — misses the hook use case.
+
+### R28 · Case-B branch simplification (empty vs non-empty pwd)
+**Decision:** When `list-scopes` returns zero:
+- pwd fully empty → the original three-way prompt.
+- pwd non-empty but no handoff docs (the FTU case) → simplified two-way prompt with option 1 recommended.
+- No resume signal at all → silent exit (see R27).
+
+**Rationale:** the FTU case — user just made a directory, copied some files in, and asked to start — accounted for a disproportionate share of "wait, why is take-over asking me a three-way question when the answer is obvious" complaints. Detecting a working directory (non-empty) is a cheap heuristic that removes one unneeded question.
+
+**Rejected:** auto-init in the FTU case — still needs one confirmation because the wrong scope is a permanent cost.
+
+### R29 · Windows / MSYS path convention documented
+**Decision:** SKILL.md Prerequisites gains a "Path convention on Windows / MSYS" subsection stating that `uv run <path>` requires a native `C:\...` path, not `/c/...`. The script itself internally accepts both via `resolve_msys_path`, but the path handed to `uv run` bypasses that translation.
+
+**Rationale:** the hand-off skill hit this bug immediately after v0.5 rollout on Windows (see 调用记录-20260720.md § "Windows 路径 shell 语法陷阱"). Documenting once at the top costs less than agents re-deriving the fix per session.
+
+### R30 · Frontmatter enum knowledge propagation
+**Decision:** New file `references/frontmatter-fields.md` documents `kind` / `status` / `last_writer` enums + timestamp format. Templates now include a top-of-file `<!-- Frontmatter enums ... -->` comment listing valid values. SKILL.md init-branch greeting explicitly names the `status` enum.
+
+**Rationale:** the enum values (particularly `status`: `in-progress|blocked|phase-complete|archived`, notably NOT `complete`) were previously only visible inside `reconcile.py`'s constants. Agents editing frontmatter would guess reasonable values (`complete`, `done`, `in_progress` underscore-style) and hit validation errors on next take-over. Publishing the enum in three places (reference doc, template comment, greeting) creates redundancy where the cost of a wrong guess is high.
+
+### R31 · Cross-skill visibility: greeting names hand-off
+**Decision:** Step 0.5 greeting and Step 7 summary both end with a line naming the companion `hand-off` skill and its trigger phrases (`先到这` / `handoff` / `continue later`).
+
+**Rationale:** take-over and hand-off are peer skills that don't currently reveal each other's existence. Users who used take-over once had no signal that hand-off was the way to save progress next time. This is not a runtime coupling — it's UX-level cross-linking, one line of text.
+
+**Rejected:** auto-installing hand-off — too invasive, and each skill remains independently installable per the 2026-07-17 self-contained decision.
+
+---
+

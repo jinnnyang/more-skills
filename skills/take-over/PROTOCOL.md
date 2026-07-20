@@ -136,17 +136,28 @@ Triggered by: loading the skill; user says "continue previous work" / "接着之
 All Python invocations use `uv run <SKILL_DIR>/scripts/reconcile.py …` where `<SKILL_DIR>` is this skill's directory. `uv run` is already isolated for scripts with inline `# /// script` metadata — do not pass `--isolated`.
 
 ```
-Step 0  Bootstrap Check & Initial Loading
-        - If `<scope>/` is missing, initialize the directory.
-        - Create empty default files using templates from this skill's templates/ directory.
-        - Report: "No previous handoff history found. Initialized empty session." and exit take-over flow.
+Step 0    Bootstrap + Scope Discovery
+          - list-scopes; branch on 0 / 1 / N and on presence of a resume signal.
+          - Empty pwd + resume signal → 3-way init prompt.
+          - Non-empty pwd + resume signal + no scope → 2-way init prompt.
+          - No resume signal → silent exit.
 
-Step 1  Discover
-        - Scan <scope>/ for the document set.
-        - Read only YAML frontmatter of every file first.
-        - Determine freshness: last_updated vs `git log -1 --format=%cI`.
+Step 0.5  Initial Context Seeding (init branch only)
+          - Take-over MUST seed context.md § Project Description and
+            task.md § Now from the user's triggering message before greeting.
+          - Runs `review-handoff --allow-fresh` to confirm the seed passes.
 
-Step 2  Reality check (reconciliation)     ← Offloaded to reconcile.py
+Step 1    Validate frontmatter (`reconcile.py validate`)
+          - Kind enum + timezone-aware timestamps + status/writer enums.
+
+Step 1.5  Handoff Acceptance Review (`reconcile.py review-handoff`)
+          - Static acceptance check against the previous session's artifacts.
+          - Verdict = pass | reject | fresh_init.
+          - REJECT halts loading; user picks Reject / Remediate / Force-continue.
+          - Remediation loop: take-over patches issues in place, re-runs review,
+            max 3 passes before falling back to Reject.
+
+Step 2    Reality check (reconciliation)     ← Offloaded to reconcile.py
         - Execute `reconcile.py check-reality --apply-soft-conflicts` to verify:
           * `git status --porcelain`         → uncommitted changes? (PRIMARY EVIDENCE)
           * `git log -5 --name-only`         → recent commit history (PRIMARY EVIDENCE)

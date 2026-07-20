@@ -9,6 +9,15 @@ session_id: {{SESSION_ID}}
 status: in-progress
 ---
 
+<!--
+Frontmatter enums (see references/frontmatter-fields.md for full details):
+  kind         : context | task | walkthrough | questions | plan | review
+  status       : in-progress | blocked | phase-complete | archived   (NOT 'complete')
+  last_writer  : hand-off | take-over | user | migration
+  last_updated / last_verified : ISO-8601 WITH timezone offset (e.g. 2026-07-20T14:30:00+08:00)
+                                  last_verified may also be the literal "SKIPPED".
+-->
+
 # Project Invariants & Context
 
 > [!NOTE]
