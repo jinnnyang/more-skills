@@ -189,4 +189,5 @@ Print concise summary: files written, cleanup audit trail (N cleared, M stale, A
 - `references/clarify-templates.md` — copy-pasteable `clarify()` templates for every user-facing decision in the workflow.
 - `PROTOCOL.md` — protocol reference (hand-off perspective).
 - `DECISIONS.md` — design decision log (chronological revisions).
+- `scripts/tests/` — pytest suite for the pure-logic parts of `reconcile.py`. Run with `uv run --with pytest --with pyyaml python -m pytest scripts/tests/ -v` before touching the classifier / health analyzer.
 - `templates/` — default doc templates seeded by `init`.
