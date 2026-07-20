@@ -19,6 +19,7 @@ For each candidate optimization, ask what would happen if the review did nothing
 - The "happy path" of the workflow requires reading `references/` — it should be visible from SKILL.md alone.
 - The user has to hop between three or more files to answer "how do I run this once?"
 - Version tags and rev labels are used inconsistently across files (`v0.5-rev-C`, `rev-F`, `1.4.0` all showing up in one skill).
+- **The `description:` block in SKILL.md's YAML frontmatter reads like AI product copy.** `skills_list()` shows this string to the agent *before* it decides whether to load the skill, so its tone lands earlier than SKILL.md L1. When you review a skill, read the frontmatter first — not last. (Learned the hard way on `hand-off` 2026-07-20: the humanize pass rewrote SKILL.md body and every reference, but missed the frontmatter until end-of-cycle sanity check. Fix landed as commit `590a61c` on `hand-off/SKILL.md`.)
 
 ## Positive signals for P1 (correctness and maintainability)
 
