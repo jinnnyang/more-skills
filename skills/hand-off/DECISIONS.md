@@ -309,3 +309,78 @@ Each step in SKILL.md's workflow references the applicable file(s) so the agent 
 - Split SKILL.md by revision (`SKILL-rev-E.md`, `SKILL-rev-F.md`) — the file is not a changelog; that's what `DECISIONS.md` is for.
 - Fold `PROTOCOL.md` into `references/` — the protocol document is deliberately at the skill root because it describes the whole hand-off / take-over contract, not just this skill's UI. Moving it would obscure that.
 
+
+## 2026-07-20 — Review-cycle changes (v1.4.0)
+
+Batch of changes captured in `REVIEW-2026-07-20.md`; landed across four commits (`4784816` → `73cc957` → `f305eda` → `83869aa`).
+
+### R16 · SKILL.md first-screen ergonomics (cross-cutting)
+- Added `## Mental Model (90 seconds)` block: three-action flow (`prepare → write → clean-up`) + `next_action` decision table.
+- Added `## Happy Path (safe_to_apply branch)` copy-pasteable command block.
+- Reason: a fresh agent used to have to load `references/next-actions.md` + `PROTOCOL.md §11a` before it could parse Step 1's output. Now the branch enum is self-explaining from SKILL.md alone; references still hold the detailed contracts.
+
+### R17 · Terminology sweep — external `rev-*` / `v0.x` labels removed (cross-cutting)
+- SKILL.md `version: 1.4.0` (semver) is now the only external version knob.
+- All `rev-A/B/C/F` and `v0.5-*` references stripped from SKILL.md, PROTOCOL.md, references/*, and reconcile.py docstrings.
+- DECISIONS.md keeps its internal `rev-*` labels (this file is the chronological log; those labels are its lingua franca and never leak out).
+- Reason: rev labels here have no coherent global meaning — `rev-F` in §11a is unrelated to `rev-2` in the R-series above. Someone reading `## 11a. Multi-Hop Trust Health (rev-F · 2026-07-17)` three months later has no way to decode "rev-F is the 6th revision *of this section*, unrelated to SKILL.md v1.4.0". Internal build state should not leak into user-facing docs.
+
+### R18 · references/clarify-templates.md added (hand-off specific)
+- New reference file with concrete `clarify(question, choices)` shapes for every branch (`halt` × 3 patterns, `challenge_required` × 2 shapes, `clarify_unsure` × 2 modes, Git decision × 2 variants) + a §5 anti-patterns list.
+- Cross-linked from SKILL.md `## Interaction Rule` and `references/next-actions.md`.
+- Reason: prior docs said "batched clarify with structured choices" without showing the JSON shape, letting different sessions invent divergent UIs. Standardising here keeps UX consistent across agents and models.
+
+### R19 · reconcile.py pytest suite (cross-cutting)
+- `scripts/tests/test_reconcile.py` — 26 tests covering `classify_cleanup` (12), `_rebuild_questions_body` (5), `_analyze_multihop_health` (9).
+- Module loaded via `SourceFileLoader` because reconcile.py's PEP-723 `# /// script` header trips normal `import`.
+- Git dependencies stubbed via autouse `_isolate_git` fixture — no `git init` required, suite runs in < 0.5 s on Windows.
+- Reason: reconcile.py encodes the most consequential product decisions (five-bucket cleanup, health thresholds, Open→Closed archive semantics). Any future refactor risks silently breaking these. Tests establish a safety net before we touch the internals.
+- Explicitly not covered: `_prepare_scope`/`cmd_prepare` composite output (needs a real git repo fixture — deferred until a regression forces it).
+
+### R20 · `.gitattributes` LF normalisation (repo-level, cross-cutting)
+- Added at repo root: `*.md text eol=lf` + friends for `*.py` / `*.yml` / `*.json` / `*.toml`.
+- Reason: silences repeated `warning: in the working copy ... CRLF will be replaced by LF` on Windows commits; also stabilises hash comparisons across platforms.
+
+### R21 · When-to-Run trigger set (hand-off specific)
+- Restored "context window feels tight" as a soft trigger (was silently dropped in v1.4.0 due to no reliable runtime signal for context usage).
+- Kept: explicit `"先到这"` / `"换你上"` / `"handoff"` / `/handoff` and "major todo phase completes".
+- Reason: agents *can* self-assess when their state is at risk even without a hard percentage signal — losing that intent left the trigger set too narrow.
+
+
+## Empirical Calibration Log (Multi-Hop Trust Health)
+
+`_analyze_multihop_health` uses four thresholds that were chosen a-priori before any real usage. This log records **every observed `challenge_required` trigger in the wild** so we can revisit the thresholds when we have data.
+
+**Current thresholds (hypotheses, v1.4.0 / 2026-07-20):**
+- `inferred_pct ≥ 40` (with `hop_count ≥ 3`) → hallucination-cascade issue
+- `untagged_pct ≥ 50` (with `hop_count ≥ 3`) → untraceable-source issue
+- `stale_invariants_count ≥ 5` (git blame > 30 days) → currency issue
+- `soft_conflicts ≥ 3` (unresolved in questions.md) → debt-accumulation issue
+- Verdict: 0 issues → `healthy`, 1 → `warning`, ≥ 2 → `unhealthy` → `challenge_required`
+
+**Target trigger distribution** (goal, not enforceable):
+- We *want* `challenge_required` to fire on roughly the top 10-20 % of long-lived scopes. If it fires on every 3rd hand-off in every project, users will train themselves to click through and the mechanism dies. If it never fires, it's dead code that inflates the review surface for no benefit.
+
+### How to record a real trigger
+
+When `prepare` returns `next_action = "challenge_required"` on a real project, append a bullet under `### Log entries` below with:
+
+- **Date** (ISO date of the hand-off)
+- **Project + branch** (or scope path if not in a repo)
+- **`hop_count`** and **`inferred_pct`** / **`untagged_pct`** / **`stale_invariants_count`** / **`soft_conflicts`** at trigger
+- **`inferred_samples`** — how many samples `prepare` surfaced (≤ 3 today)
+- **User response** — for each surfaced sample: kept as-is / promoted to `[user:*]` / deleted / rewritten
+- **False-positive?** — subjective flag; true if the user felt the trigger wasn't warranted
+
+Manual for now — no `prepare`-side auto-logging because `prepare` must stay read-only (adding a filesystem side-effect would break its atomic-preflight contract). If this log accumulates > 5 entries and we still want auto-recording, add a `--calibration-log <path>` opt-in flag to `prepare` at that point (not before).
+
+### Log entries
+
+*(empty — no in-the-wild triggers yet)*
+
+### Review cadence
+
+- After **N = 5** real trigger entries → review whether thresholds are firing appropriately; adjust and record the adjustment as a new `R*` entry above.
+- After **N = 10** entries → consider whether the a-priori thresholds should become learnt / per-project.
+
+
