@@ -15,36 +15,36 @@ metadata:
 
 # Session Hand-Off
 
-Structured session-closing workflow that atomically persists project state to a **scope directory** so the next agent (or the next you) can pick up without amnesia. Self-contained: everything lives under this skill's directory.
+Close a session cleanly so whoever picks up next — another agent, or you next Tuesday — doesn't have to reverse-engineer where things stood. This skill writes the current state down atomically to a **scope directory** and prunes what's already resolved. Everything it needs lives under this skill's own directory.
 
-Companion resume-side skill: `take-over` (independently installable).
+Sister skill for the resume side: `take-over` (install separately).
 
 ---
 
 ## Mental Model (90 seconds)
 
-A hand-off is **three actions** on a *scope directory* (usually the repo root or a subtree you're working in):
+Three actions on a *scope directory* (usually the repo root, or a subtree you're working inside):
 
 ```
-1.  prepare   →  script inspects scope, tells you what's next
+1.  prepare   →  script inspects the scope and tells you what's next
 2.  write     →  you update task.md / walkthrough.md / questions.md / context.md
-3.  clean-up  →  script prunes resolved entries + archives closed questions
+3.  clean-up  →  script prunes resolved entries and archives closed questions
 ```
 
-**You never decide the branch yourself** — `prepare` returns a `next_action` field with one of four values:
+You don't guess which branch to take. `prepare` returns a `next_action` field with one of four values:
 
 | `next_action` | What just happened | What you do |
 | --- | --- | --- |
-| `safe_to_apply` | Green path, no conflicts, no ambiguity | Write docs, run clean-up, done |
+| `safe_to_apply` | Green path — no conflicts, no ambiguity | Write the docs, run clean-up, done |
 | `clarify_unsure` | Cleanup found entries it can't confidently classify | Batched `clarify` on those entries, then apply |
-| `challenge_required` | Multi-hop trust health is unhealthy (see references) | Break trust cascade first (batched `clarify` on inferred invariants), re-run `prepare` |
-| `halt_on_hard_conflicts` | Docs disagree with git/filesystem reality | STOP writing. Resolve conflicts, then re-run `prepare` |
+| `challenge_required` | Multi-hop trust health came back unhealthy (see references) | Break the trust cascade first (batched `clarify` on inferred invariants), then re-run `prepare` |
+| `halt_on_hard_conflicts` | The docs disagree with what git and the filesystem actually show | Stop writing. Resolve the conflicts, then re-run `prepare` |
 
-Deep details live in `references/next-actions.md`. **Read `next_action` first every time**; the rest of `prepare`'s output is context for that decision.
+Deeper details are in `references/next-actions.md`. Read `next_action` before anything else. The rest of `prepare`'s output is context for that one decision.
 
-## Happy Path (safe_to_apply branch — the common case)
+## Happy Path (the `safe_to_apply` branch — most common case)
 
-Assumes scope exists (you already ran `init` or it's an ongoing project). Copy-paste template:
+This assumes a scope already exists (you ran `init` on a previous session, or the project has been carrying one). Fill in the variables and run:
 
 ```bash
 SKILL_DIR=<absolute path to this skill>
@@ -69,7 +69,7 @@ uv run "$SKILL_DIR/scripts/reconcile.py" clean-up --scope "$SCOPE" \
 # Step 4: ask user via clarify — commit / stage-only / leave uncommitted
 ```
 
-If Step 1's `next_action` is anything other than `safe_to_apply`, jump to `references/next-actions.md` and follow the contract for that branch. Don't improvise.
+If Step 1's `next_action` is anything other than `safe_to_apply`, open `references/next-actions.md` and follow the contract for that branch. This isn't a place to improvise — the branches encode conflict-handling that took real hallucination pain to figure out.
 
 ## Prerequisites
 
@@ -85,7 +85,7 @@ If Step 1's `next_action` is anything other than `safe_to_apply`, jump to `refer
 
 ## Layout (flat-file)
 
-Handoff docs live directly in the working scope directory using natural short names — the enclosing directory identifies what they describe.
+Handoff docs live directly in the working scope directory using natural short names. The enclosing directory identifies what they describe.
 
 ```
 <scope>/context.md
@@ -100,9 +100,9 @@ Optional docs (`plan.md`, `review.md`) may also be present. A scope is any direc
 
 ## Interaction Rule
 
-All user-facing prompts in this workflow use structured choices via `clarify` (Hermes' built-in `AskUserQuestion`). Do NOT free-text branching decisions. See `references/clarify-templates.md` for copy-pasteable `clarify()` calls covering every branch and the Git decision.
+Every user-facing decision in this workflow goes through Hermes' `clarify` tool with structured `choices`. No free-text "type A, B, or C" prompts. See `references/clarify-templates.md` for copy-pasteable calls covering each branch and the Git decision at the end.
 
-All Python invocations use `uv run <SKILL_DIR>/scripts/reconcile.py …` where `<SKILL_DIR>` is this SKILL.md's directory. `uv run` is inherently isolated for scripts with inline metadata — do not pass `--isolated`.
+All Python invocations use `uv run <SKILL_DIR>/scripts/reconcile.py …`, where `<SKILL_DIR>` resolves to the directory holding this SKILL.md. `uv run` isolates the environment on its own when the script carries inline metadata, so skip `--isolated`.
 
 ---
 
@@ -137,7 +137,7 @@ Read-only preflight (except SOFT conflicts are auto-appended to `questions.md`).
 - `next_action` ∈ `{halt_on_hard_conflicts, challenge_required, clarify_unsure, safe_to_apply}` — the branching decision. **Read this first.** Full contract per branch in `references/next-actions.md`.
 - `guidance` — `[AGENT GUIDANCE]` string for inline reading.
 
-Cross-check the current session's real mutations before writing anything:
+Before you write anything, sanity-check what this session actually changed on disk:
 
 ```bash
 git status --short
@@ -146,48 +146,50 @@ git log -5 --name-only --pretty=format:'%h %s'
 
 ### Step 2: Update the four core docs (Atomic Write)
 
-Write via `reconcile.py write-atomic` — never bypass with direct `open(..., "w")`. Three input patterns (`--content`, `--content-file`, stdin) in `references/atomic-writes.md`.
+Always write through `reconcile.py write-atomic`. A direct `open(..., "w")` skips the concurrency lock and the frontmatter preservation, and both of those matter more than they sound. Three input patterns (`--content`, `--content-file`, stdin) are in `references/atomic-writes.md`.
 
-Update the four core documents according to their conventions in `references/document-conventions.md`:
+Then update the four documents following the conventions in `references/document-conventions.md`:
 
-- **`task.md`** — persist current `todo` verbatim (no summarizing).
-- **`walkthrough.md`** — append dated `## YYYY-MM-DD — <slug>` entry (decisions, changes, surprises).
-- **`questions.md`** — `## Open` for active items, `## Closed` for archive. Use `<!-- resolved -->` to auto-archive on next cleanup.
-- **`context.md`** — additive-only invariants; **every bullet must carry a provenance tag** (`[git:*]` / `[user:*]` / `[test:*]` / `[inferred:*]` / `[unknown]`). See `references/document-conventions.md §context.md` for tag semantics and anti-patterns.
+- **`task.md`** — the current `todo` list, verbatim. No summarising.
+- **`walkthrough.md`** — append a dated `## YYYY-MM-DD — <slug>` entry covering decisions, changes, and anything surprising.
+- **`questions.md`** — `## Open` for what's active, `## Closed` for the archive. Mark resolved entries with `<!-- resolved -->` and the next cleanup pass moves them for you.
+- **`context.md`** — additive only, and every bullet carries a provenance tag (`[git:*]` / `[user:*]` / `[test:*]` / `[inferred:*]` / `[unknown]`). See `references/document-conventions.md §context.md` for what each tag means and where they tend to go wrong.
 
 ### Step 3: Cleanup — Apply
 
-Step 1's `prepare` already produced the classification plan. Branch on `next_action` per `references/next-actions.md`. In summary:
+Step 1 already produced the classification plan. Pick the branch from `next_action` and follow `references/next-actions.md`. Short version:
 
-- **`challenge_required`** → resolve first (mutates `context.md` before Step 2 write, then re-runs `prepare`).
-- **`clarify_unsure`** → batched `clarify` on UNSURE items, then apply.
-- **`safe_to_apply`** → apply directly.
+- **`challenge_required`** — resolve first. This mutates `context.md` before Step 2's writes, then re-runs `prepare`.
+- **`clarify_unsure`** — batched `clarify` on the UNSURE items, then apply.
+- **`safe_to_apply`** — apply directly.
 
 ```bash
 uv run <SKILL_DIR>/scripts/reconcile.py clean-up --scope <path> \
   --apply --session-id "{session_id}"
 ```
 
-Removes CLEAR + STALE walkthrough entries; moves ARCHIVED question entries from `## Open` to `## Closed` (permanent). UNSURE always preserved.
+Cleanup deletes CLEAR and STALE walkthrough entries, moves ARCHIVED question entries from `## Open` into `## Closed` (permanent), and leaves UNSURE alone.
 
 ### Step 4: Git Decision
 
-Ask via `clarify`: commit now / stage only / don't stage. Default commit message: `docs(handoff): session hand-off — {status}` (user can edit).
+Ask the user through `clarify`: commit now, stage only, or leave things unstaged. The default commit message is `docs(handoff): session hand-off — {status}`, which the user can edit.
 
 ### Step 5: Final Summary
 
-Print concise summary: files written, cleanup audit trail (N cleared, M stale, A archived, K unsure), leftover SOFT conflicts, explicit next actions for the successor agent.
+End with a short, concrete recap: which files got written, the cleanup audit trail (N cleared, M stale, A archived, K unsure), any SOFT conflicts left in `questions.md`, and the next actions the successor agent should pick up.
 
 ---
 
-## References (load on demand)
+## References
+
+Load these on demand. You don't need any of them for a `safe_to_apply` run.
 
 - `references/scope-resolution.md` — scope discovery, `--scope` rules, batch operations.
-- `references/atomic-writes.md` — three `write-atomic` input patterns.
-- `references/document-conventions.md` — writing rules for each of the four docs (including provenance tags).
-- `references/next-actions.md` — full contract for each `next_action` branch.
-- `references/clarify-templates.md` — copy-pasteable `clarify()` templates for every user-facing decision in the workflow.
-- `PROTOCOL.md` — protocol reference (hand-off perspective).
-- `DECISIONS.md` — design decision log (chronological revisions).
-- `scripts/tests/` — pytest suite for the pure-logic parts of `reconcile.py`. Run with `uv run --with pytest --with pyyaml python -m pytest scripts/tests/ -v` before touching the classifier / health analyzer.
+- `references/atomic-writes.md` — the three `write-atomic` input patterns.
+- `references/document-conventions.md` — writing rules for each of the four docs, including provenance tags.
+- `references/next-actions.md` — the full contract for every `next_action` branch.
+- `references/clarify-templates.md` — copy-pasteable `clarify()` calls for every user-facing decision in the workflow.
+- `PROTOCOL.md` — the protocol reference, hand-off perspective.
+- `DECISIONS.md` — chronological design decision log.
+- `scripts/tests/` — pytest suite for the pure-logic parts of `reconcile.py`. Run `uv run --with pytest --with pyyaml python -m pytest scripts/tests/ -v` before you touch the classifier or the health analyzer.
 - `templates/` — default doc templates seeded by `init`.
