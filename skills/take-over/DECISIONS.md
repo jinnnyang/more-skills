@@ -369,5 +369,17 @@ Additionally added a **§Version conventions** table to `DECISIONS.md` Meta sect
 
 **Impact:** No behavioural change. Future reviewers can trace R24–R31 back to the first-hand observation. Filename now sorts next to `REVIEW-2026-07-20.md` in `ls`, making the two-report structure discoverable.
 
+### Review-cycle close-out (2026-07-20)
+
+The 2026-07-20 `skill-review-cycle` pass covered SKILL.md first-screen ergonomics, ADR-id collision fixes, and version-label reconciliation. Three commits landed on branch `more`:
+
+- **`4d60311`** — R32 · SKILL.md first-screen humanize + 90-second mental model
+- **`e89918c`** — R33 · DECISIONS.md R17 collision + version-label reconciliation
+- **`186d7c5`** — R34 · Landed dogfood report as `REVIEW-2026-07-20-dogfood.md`
+
+Deferred to a future review by explicit user decision (Step 6 checkpoint): P1c residual (~15 min of §0a interior lines), P2 (reconcile.py tests + file split), P3 (references list ordering + PROTOCOL §13 stale open question). See `REVIEW-2026-07-20.md § Review-cycle summary` for the full backlog.
+
+Skill semver stays at **1.4.0** — no user-observable behaviour changed, only prose and bookkeeping. Bump to 1.4.1 is not required per the §Version conventions rules.
+
 ---
 
