@@ -301,3 +301,21 @@ Verdict is `pass | reject | fresh_init`. `reject` blocks Step 2 and offers three
 
 ---
 
+## 2026-07-20 — Review-cycle changes (v1.4.1)
+
+Follow-up landing from `REVIEW-2026-07-20.md`. All items in this section are UX/legibility polish, not protocol changes. No `SKILL.md` frontmatter version bump (still 1.4.0 for now; may bump to 1.4.1 at close-out).
+
+### R32 · SKILL.md first-screen humanize + 90-second mental model (take-over specific)
+**Decision:** Rewrote the SKILL.md `description:` frontmatter (previously AI product copy: "Guides the agent through a structured session resume/take-over workflow…") into a plain-voice one-liner. Added a **90-second mental model** section right after the H1, before Overview: one-liner opener, three-action flow (Discover → Verify → Restore + summarise), explicit "skip ahead if you know the model" pointer. Also lightly humanized §0a's opening paragraph and Step 1.5's `pass/fresh_init/reject` bullets, and unified `<>` vs `{}` placeholder brackets in Step 0 / Step 2 / Step 7 code fences.
+
+**Rationale:** `skills_list()` shows the `description` string before the agent decides whether to load the skill, so its tone lands earlier than SKILL.md L1. The old description was 3 sentences of institutional voice — same failure mode caught in `hand-off` on the same day (commit `590a61c`). The 90-second block gives the agent a mental model before it has to wade through Prerequisites + Windows path notes + When-to-Run + Layout + Scope Resolution + §0a. `skill-review-cycle`'s `references/prose-voice.md` explicitly calls the frontmatter description out as a P0 signal.
+
+**Rejected:**
+- Rewrite SKILL.md body wholesale — the 7-step workflow is genuinely 7 steps; brute-shortening loses branch logic.
+- Move Prerequisites below the mental model — planned but demoted to `[-]` because the mental model already tells impatient readers to skip ahead, and physically reordering the sections churns diff for marginal benefit.
+- Leave the description untouched, only add the mental model — misses the `skills_list()` first-impression fix.
+
+**Impact:** First-load ergonomics parity with `hand-off` post-humanize. No behavioural change; workflow steps unchanged.
+
+---
+

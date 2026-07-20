@@ -1,9 +1,7 @@
 ---
 name: take-over
 description: |
-  Guides the agent through a structured session resume/take-over workflow.
-  Triggers when the session starts or when the user says "continue previous work" or "接着之前的做".
-  Discovers prior handoff state at a scope directory (`context.md` / `task.md` / `walkthrough.md` / `questions.md`), runs an acceptance review to confirm the docs are usable, performs Git reality reconciliation, and restores task checklists.
+  Pick up where the previous session stopped, without amnesia. Loads the handoff docs left by the companion `hand-off` skill, checks they're actually usable (acceptance review), cross-checks what they claim against `git status` / `git log`, and restores the todo list. Triggers on "接着之前的做" / "continue previous work" / "resume", or when the skill is auto-loaded and a handoff scope already exists at pwd.
 version: 1.4.0
 author: 刘工 + Hermes Agent
 license: MIT
@@ -15,7 +13,21 @@ metadata:
 
 # Session Take-Over Skill
 
-Provides a structured session-resuming workflow to seamlessly pick up the project state left by the previous session.
+Pick up where the previous session stopped, without amnesia.
+
+## 90-second mental model
+
+The previous session (or an agent, or you yourself) ran the companion `hand-off` skill before stopping. That left four short files (`context.md` / `task.md` / `walkthrough.md` / `questions.md`) in a **scope directory** — usually pwd, sometimes a subtree. `take-over` picks that up.
+
+Three things happen, roughly in order:
+
+1. **Discover** — find the scope. Zero, one, or several may exist; you ask the user only when it's genuinely ambiguous.
+2. **Verify** — an *acceptance review* checks the docs aren't empty templates, then a *reality check* cross-references what the docs claim against `git status` / `git log`. Anything that looks wrong gets tiered: HARD conflicts halt loading, SOFT conflicts get logged to `questions.md` and you continue.
+3. **Restore + summarise** — parse `task.md`'s checklist into the runtime `todo`, greet the user with "here's where we are, what would you like to focus on".
+
+If pwd has no handoff docs and the user clearly wasn't asking to resume, exit silently. Never invent state.
+
+The rest of this file is the walk of that flow (Steps 0–7). Skip to §"Take-Over Execution Workflow" if you know the model already.
 
 ## Overview
 
@@ -89,17 +101,17 @@ Batch operations (`validate`, `check-reality`, `review-handoff`, `clean-up`) acc
 
 ## §0a · Yield-Turn Fallback Protocol (Choice Tool Fallback Rule)
 
-This skill asks the user structured questions at several branch points. The interaction contract is:
+This skill asks the user a structured question at several branch points. How it looks depends on what the runtime provides.
 
-**Preferred path — structured question tool.** If the runtime exposes `AskUserQuestion` / `clarify` / `ask_question`, the agent **MUST** call it with typed `choices`. This is the deterministic path.
+**When `clarify` / `AskUserQuestion` / `ask_question` is available**, use it with typed `choices`. That's the deterministic path — no ambiguity, the user picks and you continue.
 
-**Fallback path — Markdown-numbered list + yield turn.** If no such tool is registered in the current runtime, the agent falls back to the following rules **exactly**:
+**When no such tool exists**, fall back to a plain Markdown numbered list and yield the turn. Five rules, verbatim:
 
-1. **Preamble is allowed but capped.** ≤ 3 short lines of plain-text context are allowed *before* the numbered list (e.g. "No handoff docs were found in the current directory."). Do not narrate; state the situation.
+1. **Preamble is allowed but capped.** ≤ 3 short lines of plain-text context are allowed *before* the numbered list (e.g. "No handoff docs were found in the current directory."). Don't narrate; state the situation.
 2. **The list is the last thing you emit.** After the numbered list, produce **zero** further tokens and **zero** tool calls in the same turn. Yield control immediately.
-3. **A legal numeric reply from the user is authoritative.** If the user's next message is `1` / `2` / `3` etc. matching an offered option, execute the chosen branch directly — **do NOT re-confirm** ("You picked 1, are you sure?" is forbidden). This applies to every fallback prompt in this skill.
+3. **A legal numeric reply from the user is authoritative.** If the user's next message is `1` / `2` / `3` etc. matching an offered option, execute the chosen branch directly — do NOT re-confirm ("You picked 1, are you sure?" is forbidden). This applies to every fallback prompt in this skill.
 4. **Illegal replies loop back.** If the reply is not a legal number and not another obviously-recognisable choice, restate the same numbered list once more and yield again.
-5. **Tool-availability check is a search, not a guess.** "No structured question tool" means the agent scanned the exposed tool list and found no entry whose name matches `clarify` / `ask_question` / `AskUserQuestion` / `ask_user_question`. Assume the tool exists unless you have positively confirmed it does not.
+5. **Tool-availability check is a search, not a guess.** "No structured question tool" means you scanned the exposed tool list and found no entry whose name matches `clarify` / `ask_question` / `AskUserQuestion` / `ask_user_question`. Assume the tool exists unless you've positively confirmed it doesn't.
 
 The preamble cap (≤ 3 lines) applies to fallback mode only. When `clarify` is available, the tool's own preamble field is used and rule 1 does not apply.
 
@@ -144,7 +156,7 @@ Determine whether the user *actually asked to resume* per "When to Run":
 
 If the user chose init, run:
 ```bash
-uv run <SKILL_DIR>/scripts/reconcile.py init --scope <path> --agent "{agent_name}" --session-id "{session_id}" --writer take-over
+uv run <SKILL_DIR>/scripts/reconcile.py init --scope <path> --agent "<agent_name>" --session-id "<session_id>" --writer take-over
 ```
 
 Then proceed to **Step 0.5 · Initial Context Seeding**.
@@ -195,24 +207,24 @@ git log -1 --format=%cI
 
 ### Step 1.5 · Handoff Acceptance Review
 
-Before spending context on the docs' bodies, verify the previous session actually left something usable:
+Before spending context on the docs' bodies, check that the previous session actually left something usable:
 
 ```bash
 uv run <SKILL_DIR>/scripts/reconcile.py review-handoff --scope <path>
 ```
 
-The helper returns `{"status": "pass" | "reject" | "fresh_init", "issues": [...]}`. `issues[]` items carry `severity ∈ {REJECT, WARN, INFO}`, a machine-readable `kind`, and human-readable `detail` + `suggestion`.
+The helper returns `{"status": "pass" | "reject" | "fresh_init", "issues": [...]}`. Each `issues[]` entry carries `severity ∈ {REJECT, WARN, INFO}`, a machine-readable `kind`, and human-readable `detail` + `suggestion`.
 
-Branch on `status`:
+What to do next depends on `status`:
 
-- **`pass`** → continue to Step 2.
-- **`fresh_init`** (only appears with `--allow-fresh`) → continue to Step 2; note the "fresh-init only" fact in the eventual Step 7 summary so the user knows they're resuming from a bootstrap seed rather than a real prior session.
-- **`reject`** → do NOT proceed to Step 2. Present the acceptance-review verdict to the user (§0a). Show:
+- **`pass`** — continue to Step 2.
+- **`fresh_init`** (only appears with `--allow-fresh`) — continue to Step 2, but remember to mention "fresh-init only" in the Step 7 summary so the user knows they're resuming from a bootstrap seed rather than a real prior session.
+- **`reject`** — do NOT proceed to Step 2. Present the verdict to the user via §0a. Show:
   - A one-line summary of each REJECT issue (`<file>: <detail>` — do NOT dump the whole JSON).
   - Any WARN issues as a brief bullet list underneath.
-  - Then the three-choice prompt:
-    1. **Reject the handoff and stop** — take-over exits and reports back to the user that the previous session's artifacts are incomplete; the user or the previous agent should re-run hand-off after fixing the issues before take-over is attempted again.
-    2. **Have take-over remediate now** — take-over enters the *Remediation Sub-flow* below, fixes each REJECT issue in place, then re-runs `review-handoff`. Only when review returns `pass` (or `fresh_init`) does take-over continue to Step 2.
+  - Then a three-choice prompt:
+    1. **Reject the handoff and stop** — take-over exits and reports back that the previous session's artifacts are incomplete. The user or the previous agent should re-run hand-off after fixing the issues before take-over is attempted again.
+    2. **Have take-over remediate now** — enters the *Remediation Sub-flow* below, fixes each REJECT issue in place, re-runs `review-handoff`. Only when review returns `pass` (or `fresh_init`) does take-over continue to Step 2.
     3. **Force continue anyway** — user explicitly accepts the risk. Log each remaining REJECT issue into `<scope>/questions.md § Open` as a `### Acceptance override · <kind> · <timestamp>` entry (via `write-atomic`) so the risk is auditable, then continue to Step 2.
 
 #### Remediation Sub-flow (option 2)
@@ -234,7 +246,7 @@ After every remediation write, re-run `review-handoff --scope <path>` and loop u
 
 Offload reconciliation to the helper, appending any SOFT conflicts to `questions.md`:
 ```bash
-uv run <SKILL_DIR>/scripts/reconcile.py check-reality --scope <path> --apply-soft-conflicts --session-id "{session_id}" --agent "{agent_name}"
+uv run <SKILL_DIR>/scripts/reconcile.py check-reality --scope <path> --apply-soft-conflicts --session-id "<session_id>" --agent "<agent_name>"
 ```
 
 - Parse the JSON output — `hard_conflicts`, `soft_conflicts`, `applied_soft_conflicts` (count of SOFT entries appended under `## Open` in `questions.md` as `### Soft conflict · …` subsections).
@@ -283,8 +295,8 @@ If import chosen, re-run Step 4 against the updated `task.md`.
 Print a resume greeting:
 ```
 Scope: <path>
-Previous agent: {last_agent}. Last verified: {last_verified_timestamp}.
-Acceptance review: {pass | fresh_init | force-continued (with N overrides)}.
+Previous agent: <last_agent>. Last verified: <last_verified_timestamp>.
+Acceptance review: <pass | fresh_init | force-continued (with N overrides)>.
 N soft conflicts logged (see questions.md ## Open § Soft conflict), M hard conflicts resolved.
 [If N <= 3, list the soft conflicts here, e.g. "• ⚠️ last_verified is 10 days old"]
 Done: ...
