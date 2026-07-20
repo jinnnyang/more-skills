@@ -1,9 +1,9 @@
 ---
 name: hand-off
 description: |
-  Guides the agent through a structured session closing workflow.
+  Close a session cleanly so whoever picks up next doesn't have to reverse-engineer where things stood.
   Triggers when the user says "先到这", "换你上", "/handoff", or a major todo phase completes.
-  Ensures that the current project state (invariants, tasks, walkthrough, and human blockers) is atomically persisted to a **scope directory** as flat-layout `context.md` / `task.md` / `walkthrough.md` / `questions.md` files.
+  Writes what the session actually knows — invariants, current todo, decisions, open blockers — as flat `context.md` / `task.md` / `walkthrough.md` / `questions.md` files under a scope directory.
 version: 1.4.0
 author: 刘工 + Hermes Agent
 license: MIT
@@ -81,7 +81,7 @@ If Step 1's `next_action` is anything other than `safe_to_apply`, open `referenc
 
 - User explicitly says `"先到这"` / `"换你上"` / `"handoff"`, or uses `/handoff`.
 - Suggest when a major `todo` phase or implementation plan completes.
-- Suggest when the agent judges its own context window is getting tight and continuing would risk losing state that isn't yet persisted here.
+- Suggest when your own context window is getting tight and there's session state that isn't written down yet — better to hand off now than to lose it.
 
 ## Layout (flat-file)
 
