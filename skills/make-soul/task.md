@@ -1,12 +1,12 @@
 ---
 kind: task
 version: 1
-last_updated: 2026-07-20T08:15:00+00:00
-last_verified: 2026-07-20T08:15:00+00:00
+last_updated: 2026-07-20T09:05:00+00:00
+last_verified: 2026-07-20T09:05:00+00:00
 last_agent: Hermes Agent (ark-code-latest)
-last_writer: take-over
-session_id: sess-20260720-make-soul-deep-opt
-status: in-progress
+last_writer: hand-off
+session_id: sess-20260720-make-soul-corpus-opt
+status: phase-complete
 ---
 
 # Current Tasks
@@ -55,15 +55,17 @@ Extracted SOUL portions from the leaked-system-prompts corpus (`asgeirtj/system_
   - Ch 12 gets "拓展主题" section — Multi-Soul, re-injection payload design, SOUL versioning
   - Ch 12 step 2 now points to `examples/good/` and `examples/bad/` for practice material
 
+- `[x]` **PC5** Commit everything as one logical commit — `823bbfb feat(make-soul): deep optimization + production-corpus pass` (13 files, +1480/-39)
+- `[x]` **PC6** Housekeeping — `cccff14 chore: gitignore .handoff.lock runtime lock file`
+
 ## Now
 
-- `[ ]` Verify all cross-links between SKILL.md ↔ references ↔ examples ↔ docs resolve. Manual scan below.
-- `[ ]` Commit everything as one logical commit. Suggested message: `feat(make-soul): production-corpus optimization pass — examples/, writing rule 4, RLHF-default resistance, Anthropic reminder case study`
+- None. Both optimization passes complete and committed. Session handed off.
 
 ## Next
 
 - `[ ]` Optional dogfood: write a fresh SOUL.md using the upgraded skill on a real agent use-case. Verify Writing Rule 4 (named failure modes) actually shows up in the draft.
-- `[ ]` Optional: expand corpus coverage — add `examples/good/perplexity.md`, `examples/good/openai-personality-presets.md`. Diminishing returns after ~5, but worth doing before the corpus snapshot goes stale.
+- `[ ]` Optional corpus expansion: add 1–2 more positive examples (e.g. Perplexity's tone block, OpenAI personality presets) to broaden coverage. Diminishing returns after ~5 total, but worth doing before the corpus snapshot goes stale.
 
 ## Blocked
 

@@ -1,12 +1,12 @@
 ---
 kind: questions
 version: 1
-last_updated: '2026-07-20T03:06:22+00:00'
+last_updated: '2026-07-20T09:06:46+00:00'
 last_verified: 2026-07-20 02:58:15+00:00
 last_agent: Hermes Agent (ark-code-latest)
 last_writer: hand-off
-session_id: sess-20260720-make-soul-refactor
-status: in-progress
+session_id: sess-20260720-make-soul-corpus-opt
+status: phase-complete
 ---
 
 # Questions
@@ -24,8 +24,6 @@ status: in-progress
 > Auto-generated SOFT-conflict warnings from `check-reality --apply-soft-conflicts` are appended under `## Open` as timestamped entries — resolve them by adding `<!-- resolved -->` once addressed.
 
 ## Open
-
-- None.
 
 - None.
 
