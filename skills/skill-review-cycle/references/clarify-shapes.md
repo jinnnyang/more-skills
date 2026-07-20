@@ -1,8 +1,8 @@
-# `clarify` Shapes for skill-review-cycle
+# `clarify` shapes for skill-review-cycle
 
-> Loaded when the review workflow needs to talk to the user. Every user-facing decision uses Hermes' `clarify(question, choices)` — never free-text option enumeration.
+> Loaded whenever the review workflow needs to talk to the user. Every user-facing decision runs through Hermes' `clarify(question, choices)` rather than a free-text enumeration.
 >
-> Rule: put options in `choices`, put ONLY the question in `question`. A 5th "Other (type your answer)" option is auto-appended by the tool.
+> The rule to hold onto: options belong in `choices`, and the question alone belongs in `question`. Hermes' UI auto-appends a fifth "Other (type your answer)" option, so up to four in `choices` is enough.
 
 ## §1. After Step 2 · present the review + ask for direction
 
@@ -99,7 +99,7 @@ clarify(
 
 ## Anti-patterns
 
-1. **`clarify` with `question="A) foo B) bar" choices=[]`** — the UI can't render options from the question body; they become dead prose the user can't click.
-2. **Batching independent decisions into one clarify** — "Should I land P0 AND drop P1c AND commit as `foo`?" is unreadable. One decision per call.
-3. **Auto-answering because "the safe choice is obvious"** — if it's obvious, don't ask. If you're asking, the user picks.
-4. **Skipping the checkpoint after each P1** — you save 4 tool calls, you lose the ability to bail out mid-pipeline.
+1. **`clarify` with `question="A) foo B) bar" choices=[]`.** The UI can't lift options out of the question text. They become dead prose the user reads but can't click.
+2. **Batching independent decisions into one clarify.** "Should I land P0 and drop P1c and commit as `foo`?" is unreadable, and half of it can't be answered without splitting the question apart anyway. One decision per call.
+3. **Auto-answering because the safe choice looks obvious.** If it's obvious enough to auto-answer, it's obvious enough to skip the clarify entirely — just tell the user what you're about to do. If it isn't obvious, the user picks, not you.
+4. **Skipping the checkpoint after each P1.** You save four tool calls; you lose the ability to bail out mid-pipeline. That's a bad trade the second something goes wrong.

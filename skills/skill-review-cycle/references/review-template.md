@@ -1,8 +1,8 @@
-# REVIEW Template
+# REVIEW template
 
-> Copy this into `skills/<target-name>/REVIEW-<YYYY-MM-DD>.md` before writing your review. Delete this blockquote when done.
+> Copy this file into `skills/<target-name>/REVIEW-<YYYY-MM-DD>.md` before you start writing the review. Once you're done, delete this blockquote.
 >
-> All bullet points must cite `file:line` or `commit-sha` evidence. If you can't cite it, don't write it.
+> Every bullet you write needs to cite `file:line` or a `commit-sha`. If you can't back it up with a citation, leave it out — a review report that editorialises without evidence is worse than no report at all.
 
 # `<skill-name>` Skill — Review <YYYY-MM-DD>
 
@@ -57,7 +57,7 @@
 
 ## Rejected Alternatives
 
-Explicitly considered and NOT recommended (so we can prove we thought about them):
+Things you considered and decided not to recommend. Listing them here proves the decision was deliberate rather than an oversight:
 
 1. **`<alternative name>`** — `<why rejected>`
 2. **`<alternative>`** — `<why>`
@@ -81,7 +81,7 @@ Two or three concrete decisions that block landing. Each becomes a `clarify` cal
 
 ### Q1: `<pointed question>`
 
-Options (do NOT enumerate these in prose to the user — pass as `choices`):
+Options (these go into the `clarify` call's `choices` array, not into the question text):
 - Option A — `<one-line description>`
 - Option B — `<one-line description>`
 - Option C — `<one-line description>`
