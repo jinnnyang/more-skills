@@ -100,7 +100,7 @@ Optional docs (`plan.md`, `review.md`) may also be present. A scope is any direc
 
 ## Interaction Rule
 
-All user-facing prompts in this workflow use structured choices via `clarify` (Hermes' built-in `AskUserQuestion`). Do NOT free-text branching decisions.
+All user-facing prompts in this workflow use structured choices via `clarify` (Hermes' built-in `AskUserQuestion`). Do NOT free-text branching decisions. See `references/clarify-templates.md` for copy-pasteable `clarify()` calls covering every branch and the Git decision.
 
 All Python invocations use `uv run <SKILL_DIR>/scripts/reconcile.py …` where `<SKILL_DIR>` is this SKILL.md's directory. `uv run` is inherently isolated for scripts with inline metadata — do not pass `--isolated`.
 
@@ -186,6 +186,7 @@ Print concise summary: files written, cleanup audit trail (N cleared, M stale, A
 - `references/atomic-writes.md` — three `write-atomic` input patterns.
 - `references/document-conventions.md` — writing rules for each of the four docs (including provenance tags).
 - `references/next-actions.md` — full contract for each `next_action` branch.
+- `references/clarify-templates.md` — copy-pasteable `clarify()` templates for every user-facing decision in the workflow.
 - `PROTOCOL.md` — protocol reference (hand-off perspective).
 - `DECISIONS.md` — design decision log (chronological revisions).
 - `templates/` — default doc templates seeded by `init`.

@@ -1,6 +1,8 @@
 # `prepare` Output → `next_action` Branching Guide
 
 > Loaded by hand-off Step 1/3 when the agent needs to decide how to react to `prepare`'s JSON output. Each `next_action` value has a strict contract; violating it leaks trust or produces inconsistent docs.
+>
+> For the exact `clarify()` call shape used in each branch, see `clarify-templates.md` in this same directory.
 
 ## Priority order (top-down)
 
