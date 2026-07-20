@@ -3,15 +3,15 @@
 # requires-python = ">=3.11"
 # dependencies = ["pyyaml>=6.0"]
 # ///
-"""Session Handoff Protocol · reconcile helper (v0.5 · flat-file layout).
+"""Session Handoff Protocol · reconcile helper (flat-file layout).
 
 Deterministic logic for the `hand-off` / `take-over` skills. Keeps YAML
 parsing, git reality-check, cleanup classification, and atomic writes out
 of the LLM's cognitive path (protocol §9 invariant "script-assisted
 execution").
 
-Layout (v0.5, flat-file, no prefix)
------------------------------------
+Layout (flat-file, no prefix)
+-----------------------------
 Every handoff scope lives DIRECTLY inside a directory. The four core files
 use their natural short names — the enclosing directory identifies what
 they belong to:
@@ -447,12 +447,6 @@ _KEEP_WORD_RE = re.compile(r"\b(lesson|surprise|decision|invariant)\b", re.IGNOR
 _PLACEHOLDER_RE = re.compile(r"^\s*-?\s*(none\.?|tbd\.?|n/?a\.?)\s*$",
                               re.IGNORECASE | re.MULTILINE)
 
-# Tools-log block: tags MUST be line-anchored to avoid greedy match on prose.
-_TOOLS_LOG_RE = re.compile(
-    r"^<session-tools-log>\s*\n(.*?)\n^</session-tools-log>\s*$",
-    re.DOTALL | re.MULTILINE,
-)
-
 
 def strip_html_comments_preserving_tags(text: str) -> str:
     def _replace(m: re.Match[str]) -> str:
@@ -840,45 +834,6 @@ def _check_reality_scope(scope: Path, apply_soft: bool, session_id: str | None =
                 if len(recent_walkthroughs) >= 3:
                     break
 
-        tools_log_match = _TOOLS_LOG_RE.search(body)
-        if tools_log_match:
-            raw = tools_log_match.group(1).strip()
-            if raw and raw != "[]":
-                try:
-                    tools_log = json.loads(raw)
-                except json.JSONDecodeError as e:
-                    soft_conflicts.append({
-                        "type": "invalid_tools_log",
-                        "message": f"walkthrough <session-tools-log> not valid JSON: {e}",
-                    })
-                    tools_log = []
-                if is_git:
-                    recent_committed = git_recent_committed_files(5, cwd=scope)
-                    for call in tools_log:
-                        if not isinstance(call, dict):
-                            continue
-                        tool = call.get("tool")
-                        tgt = call.get("target")
-                        if (tool in {"write_to_file", "write_file", "patch",
-                                     "replace_file_content", "multi_replace_file_content"}
-                                and tgt):
-                            if repo_root:
-                                try:
-                                    abs_tgt = Path(tgt).resolve()
-                                    rel = str(abs_tgt.relative_to(repo_root)).replace("\\", "/")
-                                except (ValueError, OSError):
-                                    rel = str(tgt).replace("\\", "/")
-                            else:
-                                rel = str(tgt).replace("\\", "/")
-                            if rel not in uncommitted and rel not in recent_committed:
-                                soft_conflicts.append({
-                                    "type": "tool_call_no_git_evidence",
-                                    "message": (
-                                        f"walkthrough claims write to {rel!r} but no git "
-                                        "evidence (not uncommitted, not in last 5 commits)"
-                                    ),
-                                })
-
     result: dict = {
         "scope": str(scope),
         "status": "success",
@@ -1213,6 +1168,357 @@ def cmd_clean_up(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
+# ---------------------------------------------------------------------------
+# Multi-hop trust health analysis
+# ---------------------------------------------------------------------------
+# When a scope is being handed off for the 4th / 5th / Nth time, the risk of
+# hallucination cascade rises: each agent tends to trust the previous agent's
+# assertions verbatim, so a hallucinated "invariant" propagates freely until
+# a human notices. These helpers make multi-hop-ness visible to the agent so
+# it can adjust caution accordingly, without imposing costs on 1st-hop flows.
+
+# Provenance tag written by hand-off Step 2 authors on invariants / decisions:
+#   [git:<short-sha>]         backed by a git commit
+#   [user:<YYYY-MM-DD>]       user confirmed in-session
+#   [test:<test-name>]        automated test enforces this
+#   [inferred:<session-id>]   agent's own inference — treat as low-confidence
+#   [unknown]                 explicit "we don't know where this came from"
+_PROVENANCE_RE = re.compile(
+    r"\[(git|user|test|inferred|unknown)(?::([^\]]+))?\]",
+    re.IGNORECASE,
+)
+_HOP_COMMIT_RE = re.compile(r"docs\(hand[-]?off\)", re.IGNORECASE)
+
+
+def _count_hops(cwd: Path) -> tuple[int, list[str]]:
+    """Count hand-off commits in git history for this scope.
+
+    Returns (hop_count, recent_writers_or_authors). hop_count of 0 means either
+    the scope is not in a git repo, or no `docs(hand-off):` commits exist yet.
+    """
+    rc, out, _ = git(
+        "log",
+        "--pretty=format:%H|%an|%s",
+        "--",
+        ".",
+        cwd=cwd,
+    )
+    if rc != 0 or not out.strip():
+        return 0, []
+    hop_lines = [ln for ln in out.splitlines() if _HOP_COMMIT_RE.search(ln)]
+    authors: list[str] = []
+    seen = set()
+    for ln in hop_lines[:10]:
+        parts = ln.split("|", 2)
+        if len(parts) >= 2 and parts[1] not in seen:
+            authors.append(parts[1])
+            seen.add(parts[1])
+    return len(hop_lines), authors
+
+
+def _extract_provenance_lines(body: str) -> list[dict]:
+    """Scan a markdown body for lines containing a [provenance:...] tag.
+
+    Returns [{line_no, line_text, tag_type, tag_value}] sorted by line number.
+    Lines without a recognised tag are omitted; the caller can compute the
+    'untagged invariant' count from total-line-count minus this list's length.
+    """
+    hits: list[dict] = []
+    for i, line in enumerate(body.splitlines(), start=1):
+        m = _PROVENANCE_RE.search(line)
+        if not m:
+            continue
+        hits.append({
+            "line_no": i,
+            "line_text": line.strip()[:200],
+            "tag_type": m.group(1).lower(),
+            "tag_value": (m.group(2) or "").strip(),
+        })
+    return hits
+
+
+def _count_invariant_lines(body: str) -> int:
+    """Rough count of substantive lines in context.md — bullets and paragraphs.
+
+    Excludes blank lines, headers (## / ###), HTML comments, and code fences.
+    Used as the denominator for provenance-coverage %.
+    """
+    n = 0
+    in_fence = False
+    for line in body.splitlines():
+        s = line.strip()
+        if s.startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        if not s or s.startswith("#") or s.startswith("<!--"):
+            continue
+        n += 1
+    return n
+
+
+def _analyze_multihop_health(scope: Path, reality: dict) -> dict:
+    """Compute multi-hop health signals for a scope.
+
+    Never mutates disk. Reads context.md + walkthrough.md + git log to derive:
+      - hop_count             : number of docs(hand-off) commits touching this scope
+      - unique_writers        : distinct git authors + last_writer fields seen
+      - provenance_distribution : {git, user, test, inferred, unknown, untagged}
+      - stale_invariants      : context.md lines older than 30 days by git blame
+                                (best-effort; skipped if not a git repo)
+      - health                : fresh | healthy | warning | unhealthy
+      - issues                : list of human-readable strings
+    """
+    ctx_path = scope / "context.md"
+    wt_path = scope / "walkthrough.md"
+    q_path = scope / "questions.md"
+
+    # 1. Hop count from git log
+    hop_count, git_authors = _count_hops(scope)
+
+    # 2. Unique writers (union of git authors + last_writer frontmatter fields)
+    writers: set[str] = set(git_authors)
+    for p in (ctx_path, wt_path, q_path):
+        if not p.exists():
+            continue
+        try:
+            meta, _ = load_frontmatter(p.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        w = meta.get("last_writer")
+        if w:
+            writers.add(str(w))
+        a = meta.get("last_agent")
+        if a:
+            writers.add(str(a))
+
+    # 3. Provenance distribution across context.md
+    provenance_dist = {
+        "git": 0, "user": 0, "test": 0, "inferred": 0, "unknown": 0, "untagged": 0
+    }
+    inferred_lines: list[dict] = []
+    if ctx_path.exists():
+        try:
+            _, ctx_body = load_frontmatter(ctx_path.read_text(encoding="utf-8"))
+        except ValueError:
+            ctx_body = ""
+        tagged = _extract_provenance_lines(ctx_body)
+        total_lines = _count_invariant_lines(ctx_body)
+        for entry in tagged:
+            provenance_dist[entry["tag_type"]] += 1
+            if entry["tag_type"] == "inferred":
+                inferred_lines.append(entry)
+        provenance_dist["untagged"] = max(0, total_lines - len(tagged))
+
+    # 4. Stale invariants — git blame per line, filter age > 30d
+    stale_invariants: list[dict] = []
+    if ctx_path.exists() and git_repo_root(cwd=scope):
+        rc, blame_out, _ = git(
+            "blame",
+            "--line-porcelain",
+            "context.md",
+            cwd=scope,
+        )
+        if rc == 0:
+            now = datetime.now(timezone.utc)
+            # Parse porcelain blame: each block starts with a SHA line, then
+            # metadata, then a `\tline content` line.
+            blocks = blame_out.split("\n\t")
+            for block in blocks[:-1]:  # last "block" is trailing content
+                # Extract author-time
+                m_time = re.search(r"^author-time (\d+)", block, re.MULTILINE)
+                if not m_time:
+                    continue
+                m_line = re.search(r"^author-line-number (\d+)", block, re.MULTILINE)
+                # author-line-number isn't in porcelain by default; fall back
+                # to counting.
+                try:
+                    ts = int(m_time.group(1))
+                    age_days = (now - datetime.fromtimestamp(ts, timezone.utc)).days
+                except (ValueError, OSError):
+                    continue
+                if age_days > 30:
+                    # We only need the count + a couple of samples for the summary
+                    if len(stale_invariants) < 5:
+                        stale_invariants.append({
+                            "age_days": age_days,
+                        })
+
+    # 5. Health verdict
+    inferred_pct = 0
+    ctx_line_total = sum(provenance_dist.values())
+    if ctx_line_total > 0:
+        inferred_pct = int(100 * provenance_dist["inferred"] / ctx_line_total)
+    untagged_pct = 0
+    if ctx_line_total > 0:
+        untagged_pct = int(100 * provenance_dist["untagged"] / ctx_line_total)
+
+    issues: list[str] = []
+    if hop_count == 0:
+        health = "fresh"
+    else:
+        health = "healthy"
+        if hop_count >= 3 and inferred_pct >= 40:
+            issues.append(
+                f"{inferred_pct}% of context.md invariants are [inferred:*] "
+                f"(hop #{hop_count}) — high hallucination-cascade risk"
+            )
+        if hop_count >= 3 and untagged_pct >= 50:
+            issues.append(
+                f"{untagged_pct}% of context.md invariants have no provenance "
+                f"tag — cannot audit source across {hop_count} hops"
+            )
+        if len(stale_invariants) >= 5:
+            issues.append(
+                f"{len(stale_invariants)}+ context.md lines are older than 30 "
+                "days by git blame — review for currency"
+            )
+        # Reality-check soft conflicts also count as health signals
+        if len(reality.get("soft_conflicts", [])) >= 3:
+            issues.append(
+                f"{len(reality['soft_conflicts'])} SOFT conflicts pending in "
+                "questions.md — resolve before next hand-off"
+            )
+        if len(issues) >= 2:
+            health = "unhealthy"
+        elif len(issues) == 1:
+            health = "warning"
+
+    return {
+        "hop_count": hop_count,
+        "unique_writers": sorted(writers),
+        "provenance_distribution": provenance_dist,
+        "inferred_pct": inferred_pct,
+        "untagged_pct": untagged_pct,
+        "stale_invariants_count": len(stale_invariants),
+        "stale_invariants_sample": stale_invariants,
+        "inferred_samples": inferred_lines[:5],
+        "health": health,
+        "issues": issues,
+    }
+
+
+def _prepare_scope(scope: Path, apply_soft: bool, session_id: str | None,
+                   agent: str | None) -> dict:
+    """One-shot composite: reality-check + cleanup dry-run + multi-hop health.
+
+    Combines the read-only preflight phases of the hand-off flow into a single
+    JSON payload so the agent can make its next branching decision without
+    spawning multiple `uv run` subprocesses.
+
+    The output includes a `next_action` field the agent should read first:
+      - `halt_on_hard_conflicts`  : reality-check found HARD conflicts;
+                                    resolve via `clarify` before touching anything.
+      - `challenge_required`      : multi-hop trust health check flagged this
+                                    scope as unhealthy — force user
+                                    re-confirmation of key invariants before
+                                    proceeding.
+      - `clarify_unsure`          : cleanup produced UNSURE items; batch them
+                                    into one `clarify` prompt, then call
+                                    `clean-up --apply`.
+      - `safe_to_apply`           : no HARD conflicts, no UNSURE items; the
+                                    agent may proceed directly to
+                                    `clean-up --apply`.
+    """
+    if not scope.exists():
+        return {
+            "scope": str(scope),
+            "status": "error",
+            "message": f"scope {scope} does not exist",
+        }
+
+    reality = _check_reality_scope(scope, apply_soft, session_id, agent)
+    hard_conflicts = reality.get("hard_conflicts", [])
+    health = _analyze_multihop_health(scope, reality)
+
+    # If reality-check hard-failed on this scope, don't attempt cleanup —
+    # the docs are in an inconsistent state and any classification would
+    # be advising on stale ground.
+    if hard_conflicts:
+        return {
+            "scope": str(scope),
+            "status": "halted",
+            "reality": reality,
+            "cleanup_plan": None,
+            "health": health,
+            "next_action": "halt_on_hard_conflicts",
+            "guidance": (
+                f"[AGENT GUIDANCE] {len(hard_conflicts)} HARD conflict(s) — "
+                "surface each via clarify before any mutation. Do NOT proceed "
+                "to clean-up or write-atomic until resolved."
+            ),
+        }
+
+    plan = classify_cleanup(scope)
+    unsure = plan.get("unsure", [])
+
+    # Multi-hop challenge takes precedence over clarify_unsure — if the docs
+    # are unhealthy, forcing UNSURE cleanup is putting deck chairs on the
+    # Titanic. Address the trust problem first, then cleanup on next pass.
+    if health["health"] == "unhealthy":
+        next_action = "challenge_required"
+        challenge_items = health["inferred_samples"][:3] or \
+                          health.get("stale_invariants_sample", [])[:3]
+        guidance = (
+            f"[AGENT GUIDANCE] Hop #{health['hop_count']} — health: unhealthy. "
+            f"Issues: {'; '.join(health['issues'])}. "
+            "Before Step 2 write, present the top low-confidence context.md "
+            "entries to the user via ONE batched clarify prompt "
+            "(still valid / stale / rewrite). Then re-run `prepare` before "
+            "proceeding. Sample items to challenge: "
+            f"{[i.get('line_text', i) for i in challenge_items]}"
+        )
+    elif unsure:
+        next_action = "clarify_unsure"
+        health_note = (
+            f" (health: {health['health']}, hop #{health['hop_count']})"
+            if health["hop_count"] >= 2 else ""
+        )
+        guidance = (
+            f"[AGENT GUIDANCE] {len(unsure)} UNSURE cleanup item(s){health_note} — "
+            "batch them into ONE clarify prompt (keep vs drop per item), "
+            "then call `clean-up --apply` regardless of the answers "
+            "(apply preserves UNSURE by default)."
+        )
+    else:
+        next_action = "safe_to_apply"
+        health_note = (
+            f" (health: {health['health']}, hop #{health['hop_count']})"
+            if health["hop_count"] >= 2 else ""
+        )
+        guidance = (
+            f"[AGENT GUIDANCE] No HARD conflicts, no UNSURE items{health_note} — "
+            "call `clean-up --apply` directly. Report the audit trail "
+            "(clear / stale / archived counts) in the final summary."
+        )
+
+    return {
+        "scope": str(scope),
+        "status": "ok",
+        "reality": reality,
+        "cleanup_plan": plan,
+        "health": health,
+        "next_action": next_action,
+        "guidance": guidance,
+    }
+
+
+def cmd_prepare(args: argparse.Namespace) -> None:
+    """Composite hand-off preflight: reality-check + cleanup dry-run in one call."""
+    scopes = _collect_scopes(args)
+    session_id = getattr(args, "session_id", None)
+    agent = getattr(args, "agent", None)
+    apply_soft = getattr(args, "apply_soft_conflicts", False)
+    results = [_prepare_scope(s, apply_soft, session_id, agent) for s in scopes]
+    payload = _wrap_batch(results)
+    print(json.dumps(payload, indent=2))
+    if any(r.get("status") == "error"
+           or r.get("next_action") == "halt_on_hard_conflicts"
+           for r in results):
+        sys.exit(1)
+
+
 def cmd_unlock(args: argparse.Namespace) -> None:
     scope = resolve_scope(args.scope)
     lock_file = scope / ".handoff.lock"
@@ -1331,7 +1637,7 @@ def _add_scope_args(p: argparse.ArgumentParser, *, allow_all: bool = True) -> No
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Session Handoff · reconcile helper (v0.5)"
+        description="Session Handoff · reconcile helper"
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -1393,6 +1699,20 @@ def main() -> None:
     p_unlock = sub.add_parser("unlock", help="Forcibly release the concurrency lock at scope")
     _add_scope_args(p_unlock, allow_all=False)
     p_unlock.set_defaults(func=cmd_unlock)
+
+    p_prepare = sub.add_parser(
+        "prepare",
+        help="One-shot preflight: reality-check + cleanup dry-run (composite of check-reality + clean-up --dry-run)",
+    )
+    _add_scope_args(p_prepare)
+    p_prepare.add_argument(
+        "--apply-soft-conflicts",
+        action="store_true",
+        help="Also append SOFT conflicts to questions.md (same semantics as check-reality)",
+    )
+    p_prepare.add_argument("--agent", help="Active agent name")
+    p_prepare.add_argument("--session-id", help="Session ID")
+    p_prepare.set_defaults(func=cmd_prepare)
 
     args = parser.parse_args()
     args.func(args)

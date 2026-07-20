@@ -1,6 +1,6 @@
 # Session Handoff Protocol — hand-off perspective
 
-> **Status:** v0.3 (2026-07-17 rev-A) — Adopted self-contained skill layout (方案 A).
+> **Version:** 1.4.0 (tied to SKILL.md `version`). See `DECISIONS.md` for the chronological revision log.
 > **Scope:** Protocol reference for the **hand-off** side of the session handoff workflow. The companion skill `take-over` maintains its own copy of this protocol from the resume side; the two skills are independently installable and do not share files.
 > **Location:** This file is part of the self-contained `skills/hand-off/` directory. See `DECISIONS.md` in the same directory for the design decision log.
 
@@ -129,7 +129,7 @@ The frontmatter is what makes take-over's **L1 scan** cheap: an agent can slurp 
 
 ## 8. The Hand-Off Flow
 
-Triggered by: user says "先到这" / "换你上" / `/handoff`; auto-suggested when context > 75% or when a `todo` phase completes.
+Triggered by: user says "先到这" / "换你上" / `/handoff`; auto-suggested when a `todo` phase completes.
 
 All Python invocations use `uv run <SKILL_DIR>/scripts/reconcile.py …` where `<SKILL_DIR>` is this skill's directory. `uv run` is already isolated for scripts with inline `# /// script` metadata — do not pass `--isolated`.
 
@@ -137,12 +137,18 @@ All Python invocations use `uv run <SKILL_DIR>/scripts/reconcile.py …` where `
 Step 0  Bootstrap Check
         - If `<scope>/` is missing, initialize the directory structure first.
 
-Step 1  Reality check (anti-hallucination)
-        - Offload to `reconcile.py check-reality` to compute actual mutations:
+Step 1  Reality check + cleanup dry-run (anti-hallucination + preflight)
+        - Composite via `reconcile.py prepare` (one subprocess, both phases):
           * `git status --porcelain`         → what's uncommitted? (PRIMARY EVIDENCE)
           * `git log -5 --name-only`         → recent commits (PRIMARY EVIDENCE)
-          * Cross-reference walkthrough's optional `<session-tools-log>` block.
           * Diff against what task.md claims is in-progress.
+          * Classify walkthrough / questions entries (dry-run) so Step 3 apply
+            has no surprises.
+        - Output branches on `next_action`:
+            halt_on_hard_conflicts → clarify user, do NOT touch Step 2.
+            clarify_unsure         → proceed to Step 2 write, then batched clarify + Step 3 apply.
+            safe_to_apply          → proceed to Step 2 write, then Step 3 apply directly.
+        - `check-reality` and `clean-up --dry-run` remain available for advanced use.
 
 Step 2  Update core docs (Atomic Write Rule: write to `.tmp` first, then rename)
         a) task.md      ← dump current `todo` verbatim; do not "summarize" open items away.
@@ -156,7 +162,6 @@ Step 2  Update core docs (Atomic Write Rule: write to `.tmp` first, then rename)
                * Surprises / gotchas discovered
                * session_id back-reference
                * NOT a transcript replay — decisions + deltas + surprises only
-               * `<session-tools-log>` metadata: Serialize the list of actual tool calls of this session.
            - PRUNE resolved / obsolete entries per §9a (Smart Cleanup).
            - Target size < 20 KB. If exceeded, tighten pruning; do NOT split into per-session files.
         c) questions.md ← add any blockers found this session.
@@ -188,7 +193,7 @@ Step 5  Final message
 
 Both `hand-off` and `take-over` must obey (this file focuses on what `hand-off` upholds):
 
-1. **No claims without evidence.** "Completed X" is written only if `git log` or `git status --short` confirms X. The optional `<session-tools-log>` block is auxiliary evidence only — it can complement git but cannot substitute for it. Absent primary git evidence, write "attempted X, unverified".
+1. **No claims without evidence.** "Completed X" is written only if `git log` or `git status --short` confirms X. Absent primary git evidence, write "attempted X, unverified".
 2. **`last_verified` timestamp is required.** If reality-check was skipped, mark it explicitly: `last_verified: SKIPPED`.
 3. **`todo` items are never dropped implicitly.** Open items on hand-off carry over verbatim; closed items are removed only if the corresponding commit / evidence is present.
 4. **Walkthrough is written last**, after all mutations are done, so it reflects the final state — not intermediate.
@@ -235,7 +240,7 @@ Unsure about 2 items — keep or drop?
 
 **Audit trail:** every CLEAR/STALE removal is listed in the hand-off's final summary so the user sees what was cleaned. If uncertain, `hand-off` errs toward UNSURE over CLEAR.
 
-## 9b. Question Archive Semantics (v0.5-rev-C)
+## 9b. Question Archive Semantics
 
 `questions.md` uses a two-section structure — `## Open` (active) and `## Closed` (archive). Entries are `###`-level subsections under either heading.
 
@@ -272,11 +277,62 @@ Rationale: structured choices render as pickable UI, avoid ambiguity from typed 
 Ship the minimum that closes the loop:
 
 - **Documents:** `context.md`, `task.md`, `walkthrough.md`, `questions.md` only. Skip `plan.md` and `review.md` for MVP — they're optional anyway.
-- **Reality check:** `git status` + `git log -5` + `todo` diff + `<session-tools-log>` check. Skip smoke tests for MVP unless marked REQUIRED in task.md.
+- **Reality check:** `git status` + `git log -5` + `todo` diff. Skip smoke tests for MVP unless marked REQUIRED in task.md.
 - **No auto-promotion** to `docs/handoff/` — always private scratch by default.
 - **No branch-prefix** — single-branch assumption.
 
 Expand only after the MVP feedback loop shows what's actually missing.
+
+## 11a. Multi-Hop Trust Health
+
+A hand-off scope is rarely single-hop. Session A hands to session B, B to C, and so on. Each hop inherits the prior agent's context.md verbatim, which creates a **hallucination cascade risk**: a fact hallucinated on hop 1 is quoted as authoritative on hop 2, referenced on hop 3, and by hop 4 no one questions the source. This protocol addresses that cascade with three composable mechanisms.
+
+### 11a.1 Provenance tags on invariants
+
+Every `context.md` bullet carries an inline source tag in `[type:value]` form:
+
+| Tag | Semantics | Confidence |
+| --- | --- | --- |
+| `[git:<short-sha>]` | Backed by a specific commit | High — verifiable |
+| `[user:<YYYY-MM-DD>]` | User confirmed in-session on that date | High — attributed |
+| `[test:<test-name>]` | An automated test enforces it | High — machine-checked |
+| `[inferred:<session-id>]` | Agent's own inference | Low — needs periodic re-verification |
+| `[unknown]` | Explicit "we don't know where this came from" | Zero — but honest |
+
+Untagged bullets are counted as unattributed and inflate the `untagged_pct` health signal. `[unknown]` is strictly better than no tag: it declares the ignorance rather than hiding it. Fabricating a `[git:*]` tag by guessing a SHA is worse than leaving the line `[unknown]`.
+
+### 11a.2 Hop count via `docs(hand-off):` commits
+
+`prepare` counts commits matching `docs\(hand[-]?off\)` in the scope's git history. This gives the agent a first-order signal for "how much cumulative trust has been extended without user re-confirmation". Empty commits are excluded so ceremonial commits don't inflate the number.
+
+- **Hop 1** (`fresh`) — no accumulated risk yet, all trust is direct.
+- **Hop 2** (`healthy`) — one prior agent's opinions carried forward; still tractable for the user to audit if they choose.
+- **Hop ≥ 3** — risk-tier eligible; issue detection kicks in.
+
+### 11a.3 Health verdict + `challenge_required` branch
+
+`prepare` computes a health verdict from these observables:
+
+| Rule | Issue added |
+| --- | --- |
+| `hop_count ≥ 3` **AND** `inferred_pct ≥ 40` | Hallucination-cascade risk |
+| `hop_count ≥ 3` **AND** `untagged_pct ≥ 50` | Untraceable-source risk |
+| `stale_invariants_count ≥ 5` (git blame > 30 days) | Currency risk |
+| `soft_conflicts ≥ 3` unresolved in `questions.md` | Debt-accumulation risk |
+
+Verdict thresholds: `0` issues → `healthy`, `1` issue → `warning`, `≥ 2` issues → `unhealthy`.
+
+When `health == "unhealthy"`, `prepare` returns `next_action = "challenge_required"`. The agent is contractually required to break single-directional trust inheritance by presenting the top low-confidence invariants (`inferred_samples`, up to 3) to the user via ONE batched `clarify`. User answers are then applied to `context.md`:
+
+- **still valid** → upgrade the tag to `[user:<today>]` (elevates provenance without discarding history).
+- **stale** → delete the line.
+- **rewrite** → user provides the corrected wording; new line is tagged `[user:<today>]`.
+
+Then `prepare` is re-run to confirm health has moved out of `unhealthy` before the normal flow (Step 2 write → Step 3 apply) resumes.
+
+### 11a.4 What this does NOT prevent
+
+Provenance tags rely on the writing agent's honesty. A dishonest or careless agent can still write `[git:abc123]` on a hallucinated invariant. The mitigation is **stability under scrutiny**: on later hops, `prepare` surfaces high-inferred and high-untagged scopes for user challenge, so lies get periodic testing against the user's memory. This is a defence-in-depth mechanism, not a proof of correctness.
 
 ## 12. Implementation Layout (Self-contained)
 
@@ -301,7 +357,6 @@ The companion skill `take-over` maintains an **independent** copy of the protoco
 ## 13. Open Questions (Not Yet Decision Points)
 
 - How does this interact with `subagent-driven-development`? Sub-agents don't currently write handoff docs — should orchestrators propagate context to them?
-- Any hook for auto-suggesting `hand-off` when context window > 75%? (Runtime-dependent; may not be portable.)
 - Concurrent hand-off from two live sessions writing to the same `<scope>/` — MVP assumes serial execution; needs a lock file or timestamp-based conflict prompt in v2.
 - Multi-branch layout — prefix with branch (`<scope>/<branch>/…`); deferred (see §5 caveat). Reintroduces `branch:` frontmatter field.
 - `next_agent` claim protocol — currently no way to signal "I'm about to pick this up"; if collaborative workflows appear, add a claim step.
@@ -317,4 +372,4 @@ The companion skill `take-over` maintains an **independent** copy of the protoco
 
 ---
 
-*End of PROTOCOL.md (hand-off perspective). Status: v0.3 rev-A (2026-07-17). Companion: `skills/take-over/PROTOCOL.md`.*
+*End of PROTOCOL.md (hand-off perspective). Companion: `skills/take-over/PROTOCOL.md`.*

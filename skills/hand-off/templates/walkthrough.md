@@ -34,9 +34,3 @@ status: in-progress
 - Surprise: uv inline-script metadata makes dependencies zero-config.
 
 -->
-
----
-
-<session-tools-log>
-[]
-</session-tools-log>

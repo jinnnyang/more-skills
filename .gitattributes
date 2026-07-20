@@ -1,0 +1,16 @@
+# Normalize line endings for text formats to LF.
+# Prevents CRLF/LF churn on Windows for markdown, python, YAML, and JSON.
+*.md    text eol=lf
+*.py    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.json  text eol=lf
+*.toml  text eol=lf
+
+# Explicitly binary formats.
+*.png binary
+*.jpg binary
+*.gif binary
+*.webp binary
+*.pdf binary
+*.zip binary
