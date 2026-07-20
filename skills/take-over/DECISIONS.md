@@ -10,7 +10,22 @@
 
 `DECISIONS.md` is an **Architecture Decision Record (ADR) log** — the same discipline used in long-lived open-source projects (Kubernetes, Rust, Apache) transplanted to a single skill. See `references/adr-and-decisions.md` for the full principles + practices reference.
 
-Three reasons this particular skill needs it more than most:
+### Version conventions (three axes)
+
+This skill lives at the intersection of three independent version stories. All three appear in the repo; don't conflate them:
+
+| Axis | Where it lives | What it counts | Current value |
+|---|---|---|---|
+| **Skill package semver** | `SKILL.md` frontmatter `version:` | User-visible changes to this skill's CLI/UX/behaviour. Bumps on any user-observable change. | `1.4.0` (may bump to `1.4.1` on close-out of the 2026-07-20 review-cycle) |
+| **Protocol revision** | `PROTOCOL.md` top header | The shared handoff protocol between `take-over` and `hand-off`. Bumps when the wire format, doc set, or flow shape changes. | `v0.5 (rev-C, 2026-07-17)` |
+| **Decision-batch date headers** | `DECISIONS.md` `## <date> — <title>` sections | Chronological group of ADRs that landed together. Reference by date, not by count. | `2026-07-20 — Review-cycle changes (v1.4.1)` |
+
+Rules of thumb:
+- A change that only rewords SKILL.md text is a skill-semver patch bump; protocol version untouched.
+- A change to the frontmatter fields or the doc set (`context.md` / `task.md` / …) is a protocol version bump *and* a skill-semver bump.
+- Cross-cutting decisions (both `take-over` and `hand-off`) get `(cross-cutting)` scope tag and must appear in both skills' DECISIONS.md with identical text.
+
+Three reasons this particular skill needs an ADR log more than most:
 
 1. **The design surface is subtle and easy to re-litigate.** Every field in the frontmatter, every step in the take-over flow, every conflict tier was chosen against 2–4 alternatives with real trade-offs. Without a written record, the next author (human or agent) will inevitably propose "why not just ..." for options that were already rejected months ago, wasting context on rediscovery.
 
@@ -188,14 +203,20 @@ Second round of design-doc-review findings, focused on the scripts and take-over
 **Decision:** SKILL.md invocations use `uv run <path> …` (no `--isolated`).
 **Rationale:** `uv run` is already isolated for scripts declaring inline `# /// script` metadata; passing `--isolated` produces a warning and no additional effect.
 
-### R17 · Step ordering: re-restore todo after plan-mode import (take-over specific)
+### R17b · Step ordering: re-restore todo after plan-mode import (take-over specific)
+
+> **Renumbered from `R17` to `R17b` on 2026-07-20** — the original `R17` id collided with the rev-C entry below (also numbered `R17`, describing filename-prefix retirement). Kept both entries; distinguished by suffix. All prior references to "R17" in this file that meant "step-ordering fix" now read as "R17b" (only one call site, in this entry's own body).
+
 **Decision:** SKILL.md Step 4 (Restore Checklist) is re-run at the end of Step 6 (Plan-Mode Coexistence) if the user chose "Import plan.md". The final Step 7 summary reflects the reconciled task list.
 **Rationale:** DECISIONS 2026-07-16 v0.3 ⑤ ("Pre-empt Plan-Mode Merge Check") intended the report to be up-to-date, but Step 4's original position (before Step 6) meant an imported plan.md's tasks never made it into `todo`.
 
 
 ## Rev-C (v0.5-rev-C · 2026-07-17) — Flat file naming + kind-based scope + question archive
 
-### R17 · Filename prefix `HANDOFF-` retired (cross-cutting)
+### R17a · Filename prefix `HANDOFF-` retired (cross-cutting)
+
+> Numbered `R17` in the original 2026-07-17 rev-C batch; retitled to `R17a` on 2026-07-20 to disambiguate from the older `R17b` above (step-ordering fix from the 2026-07-17 rev-B batch). The two entries were authored on the same day by different revisions and both landed under `R17` before the collision was noticed.
+
 **Decision (mirrored from hand-off/DECISIONS.md R17):** Handoff docs use natural short names; no `HANDOFF-` prefix. The enclosing directory identifies the scope.
 **Take-over impact:** Step 3 layered load references `context.md` / `task.md` / `questions.md` (was `HANDOFF-*.md`). No behavioural change; only naming.
 
@@ -316,6 +337,25 @@ Follow-up landing from `REVIEW-2026-07-20.md`. All items in this section are UX/
 - Leave the description untouched, only add the mental model — misses the `skills_list()` first-impression fix.
 
 **Impact:** First-load ergonomics parity with `hand-off` post-humanize. No behavioural change; workflow steps unchanged.
+
+### R33 · DECISIONS.md R17 collision + version-label reconciliation (bookkeeping)
+**Decision:** Renumbered the duplicate `R17` ids in `DECISIONS.md`:
+- Old `R17` at line 191 (2026-07-17 rev-B, "Step ordering: re-restore todo after plan-mode import") → **`R17b`**.
+- Old `R17` at line 198 (2026-07-17 rev-C, "Filename prefix HANDOFF- retired") → **`R17a`**.
+
+Suffix (`a` / `b`) preserves chronological order — the rev-C entry landed later but describes a naming rule, while rev-B's entry describes a step-ordering fix. Both entries carry a short "renumbered on 2026-07-20" note explaining the rename.
+
+Additionally added a **§Version conventions** table to `DECISIONS.md` Meta section, documenting the three independent version axes: skill semver (`SKILL.md` frontmatter, `1.4.0`), protocol rev (`PROTOCOL.md` top header, `v0.5 rev-C`), and decision-batch date headers. Bumped `PROTOCOL.md`'s Status line from `v0.3 (2026-07-17 rev-A)` to `v0.5 (2026-07-17 rev-C)` to match the current protocol shape (flat-file layout + kind-based scope + question archive).
+
+**Rationale:** Duplicate ADR ids are the exact anti-pattern called out by `references/adr-and-decisions.md` §6.2. The old `R17` id was silently ambiguous — anything citing "R17" in SKILL.md/PROTOCOL.md/commit messages had no unique referent. Version labels had drifted three ways (`1.4.0` in SKILL.md, `v0.3` in PROTOCOL.md, `v0.5` inside SKILL.md § Overview) making it impossible to answer "what protocol version does this skill implement?" at a glance.
+
+**Rejected:**
+- Renumber both R17 entries as `R32`/`R33` — breaks chronological order in the file and forces every "R17" reference to be tracked and rewritten. Suffix-disambiguation is cheaper.
+- Delete one of the two R17 entries — they document different decisions; both are still valid.
+- Drop the `PROTOCOL.md` version header entirely — the header is useful when comparing take-over vs hand-off drift; keep it, just make it accurate.
+- Auto-derive the protocol version from git tags — no tags yet, and this repo is a skill collection not a release train.
+
+**Impact:** Any future ADR cross-references become unambiguous. `SKILL.md § Overview`'s "(v0.5, flat-file layout)" phrasing now agrees with `PROTOCOL.md` top header. Skill semver stays at `1.4.0`; may bump to `1.4.1` at review-cycle close-out per the new §Version conventions rule.
 
 ---
 

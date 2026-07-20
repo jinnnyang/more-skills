@@ -1,6 +1,6 @@
 # Session Handoff Protocol — take-over perspective
 
-> **Status:** v0.3 (2026-07-17 rev-A) — Adopted self-contained skill layout (方案 A).
+> **Status:** v0.5 (2026-07-17 rev-C) — Flat-file layout, kind-based scope discovery, question archive semantics. Self-contained skill directories (adopted rev-A, 2026-07-17). See `DECISIONS.md § Version conventions` for the three version axes (skill semver / protocol rev / decision-batch dates).
 > **Scope:** Protocol reference for the **take-over** side of the session handoff workflow. The companion skill `hand-off` maintains its own copy of this protocol from the closing side; the two skills are independently installable and do not share files.
 > **Location:** This file is part of the self-contained `skills/take-over/` directory. See `DECISIONS.md` in the same directory for the design decision log.
 
@@ -309,4 +309,4 @@ The companion skill `hand-off` maintains an **independent** copy of the protocol
 
 ---
 
-*End of PROTOCOL.md (take-over perspective). Status: v0.3 rev-A (2026-07-17). Companion: `skills/hand-off/PROTOCOL.md`.*
+*End of PROTOCOL.md (take-over perspective). Status: v0.5 rev-C (2026-07-17). Companion: `skills/hand-off/PROTOCOL.md`.*
