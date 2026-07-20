@@ -7,3 +7,6 @@ node_modules/
 .env.*
 .deep_research_state.json
 
+# Runtime lock file from hand-off / take-over skills.
+# Written into scope directories; must not be committed.
+.handoff.lock
