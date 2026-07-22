@@ -349,6 +349,58 @@ Restored "context window feels tight" as a soft trigger — it was silently drop
 Agents *can* self-assess when their state is at risk even without a hard percentage signal. Losing that intent had left the trigger set too narrow, and users had to remember to say "handoff" out loud instead of the agent noticing.
 
 
+## 2026-07-22 (rev-H) — `write-atomic` hardening (hand-off specific)
+
+Follow-up to a full-flow dogfood pass on the MediaCrawler repo. `write-atomic` accepted any `--filepath` and always returned `status: success`, so a bash-escape trap silently wrote outside the scope and clobbered earlier writes; separately, every caller had to hand-maintain four frontmatter fields per doc on every write, which drifted timestamps across a session. rev-H adds two opt-in flags that make the safe path cheap and the unsafe path loud.
+
+### R32 · `write-atomic --scope <path>` boundary check
+
+**Decision:** `write-atomic` accepts a new `--scope <path>` argument. When set, `--filepath` is `.resolve()`d and must satisfy `filepath.is_relative_to(scope)`; a violation prints `{status: error, reason: path_outside_scope, filepath, scope, hint}` and exits `4`. The flag is opt-in — omitting it preserves the previous no-op behaviour so pre-existing callers (e.g. `cmd_init` writing templates from Python) are untouched. Happy Path in `SKILL.md` and every example in `references/atomic-writes.md` now pass `--scope "$SCOPE"`.
+
+**Rationale:** On Windows / git-bash the pattern `"$SCOPE\\${f}.md"` inside double quotes silently collapses. Bash processes `\\` → `\` and then `\$` → `$` (escape), so `${f}` reaches the tool literally, unseparated from `$SCOPE`. `write-atomic` was doing `fp.parent.mkdir(parents=True, exist_ok=True)` on whatever came in, which meant the malformed path landed in `Documents/` — outside any scope. Four consecutive writes clobbered the same wrong file and all reported `status: success`. The user had no signal until they inspected the target scope and found the `init` templates still there. A repro is captured in `references/atomic-writes.md` §Windows path pitfalls and in `TestScopeBoundary::test_bash_escape_trap_would_be_caught`.
+
+Two things had to be true for the bug to escape: the bash escaping was invisible, AND `write-atomic` had no scope model. Fixing bash quoting is a documentation problem (see `references/atomic-writes.md` §Windows path pitfalls). Fixing the scope model is the runtime safety net. rev-H does both.
+
+**Rejected alternatives:**
+- **Make `--scope` mandatory.** Would break `cmd_init`'s in-process calls and every existing agent workflow that didn't pass it. Opt-in with strong documentation is enough — the Happy Path steers everyone to the safe pattern.
+- **Warning + still write.** `warnings: []` scaffolding was drafted then removed: an out-of-scope write is exactly the class of failure this flag exists to prevent, so "warn but do it anyway" defeats the purpose. Refuse loudly, exit 4.
+- **`--strict` companion flag reserving future rules.** Considered, drafted, then removed as YAGNI — a placeholder argparse flag with no distinct behaviour is a footgun for future readers ("what does `--strict` do?" → nothing). Add it when a concrete second rule exists.
+- **Auto-detect scope via `find_scopes()` and refuse writes outside any known scope.** Too magical — a fresh scope inside an unusual root wouldn't be discovered, and the failure mode is silent. Explicit `--scope` is boring and correct.
+
+**Verification (2026-07-22):**
+- 5 new pytest cases in `scripts/tests/test_write_atomic.py::TestScopeBoundary` — default, inside-scope, outside-scope, `..` traversal, and the exact bash-trap repro from the bug report. `filepath.resolve()` before the check catches the traversal case.
+- Full suite: `46 passed` (35 pre-existing + 11 new).
+
+### R33 · `write-atomic --stamp-frontmatter`
+
+**Decision:** New opt-in flag `--stamp-frontmatter` plus three metadata inputs (`--writer` / `--agent` / `--session-id`). When set, the payload's YAML frontmatter is parsed, `last_updated` and `last_verified` are set to `datetime.now(timezone.utc).isoformat(timespec="seconds")`, and `last_writer` / `last_agent` / `session_id` are updated only when the matching argument is supplied. Payload without frontmatter → `frontmatter_missing`, exit `5`; unparseable frontmatter → `invalid_frontmatter`, exit `5`; invalid writer value is caught at argparse (`choices=VALID_WRITERS`, exit `2`). Non-metadata frontmatter keys (`kind`, `version`, `status`, etc.) are preserved verbatim. Response payload carries `stamped_frontmatter: true` when the flag fired.
+
+**Rationale:** Before rev-H, every hand-off writer had to (1) load the current doc, (2) compute an ISO timestamp, (3) update four fields × four files = sixteen places, (4) not typo the ISO format. In practice sessions ended up with all four docs stamped at a hand-picked time distinct from the actual write moment, and multi-writer sessions drifted further. `--stamp-frontmatter` collapses the ceremony into one flag while keeping `write-atomic` a pure content dumper by default.
+
+**Design constraint accepted:** the flag requires frontmatter to already exist in the payload. A hand-off doc without frontmatter is a caller bug — better to fail loudly than to invent one silently. The three metadata inputs are all optional so the flag is useful even in "just refresh the timestamps" flows.
+
+**Rejected alternatives:**
+- **Always stamp when frontmatter is present.** Breaks the "content passes through untouched" contract of `write-atomic`. Callers that intentionally preserve a historical timestamp (e.g. re-writing an archived doc) would silently lose it. Opt-in is right.
+- **Merge stamping into the atomic-write helper's Python API.** Considered — but the callers that need stamping are the shell-level `write-atomic` invocations from SKILL.md examples, not the in-process `write_atomic()` calls from `cmd_init` / `cmd_cleanup`. Keeping the Python function pure and adding the CLI layer keeps concerns separated.
+- **Support arbitrary frontmatter key overrides via `--set key=value`.** YAGNI. The five fields updated by `--stamp-frontmatter` are the exact ones handoff cares about; anything more general invites callers to invent fields with no reader.
+
+**Verification (2026-07-22):**
+- 6 new pytest cases in `scripts/tests/test_write_atomic.py::TestStampFrontmatter` — no-flag verbatim pass-through, missing frontmatter → exit 5, timestamps updated + other keys preserved, all three metadata args land, invalid writer rejected at argparse, `--scope` + `--stamp-frontmatter` orthogonal in one call.
+- `atomic-writes.md` §Frontmatter is preserved reworked to lead with the flag (was previously inverted — described the manual path first then the flag as an afterthought).
+
+### R34 · Templates: `last_writer: migration` → `{{WRITER}}`
+
+**Decision:** `templates/context.md` and `templates/task.md` now use `last_writer: {{WRITER}}` matching `templates/walkthrough.md` and `templates/questions.md`, so `reconcile.py init --writer <name>` is honoured for all four templates instead of only two.
+
+**Rationale:** Straight bug. `cmd_init` accepts `--writer` (choices=VALID_WRITERS, default `migration`), substitutes it into templates via `{{WRITER}}`. Two of four templates hard-coded `last_writer: migration` instead of the placeholder, so a caller passing `--writer hand-off` got mixed provenance across the four docs of a fresh scope. Nothing depended on this behaviour (`context.md` and `task.md` frontmatter is created once at `init` time and updated on every subsequent write), so the one-line fix is safe.
+
+**Verification:** no test needed — this is a template-only change. Manually confirmed via `grep -n last_writer templates/*.md` that all four now match.
+
+### Housekeeping · `BUG-REPORT-20260722.md` removed
+
+The bug-report artifact that drove rev-H was retained in the working tree only long enough to distill R32/R33/R34 above. Deleted before landing per the user's direction — the material is now captured here in DECISIONS.md and in the git commit chain, which is the authoritative history for this skill.
+
+
 ## Empirical Calibration Log (Multi-Hop Trust Health)
 
 `_analyze_multihop_health` uses four thresholds that were chosen a-priori, before any real usage. This log records **every observed `challenge_required` trigger in the wild** so we can revisit the thresholds once we have data.
