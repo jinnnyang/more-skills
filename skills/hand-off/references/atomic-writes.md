@@ -43,4 +43,63 @@ Equivalent to pattern 2 when the payload is already in a file; useful when the p
 
 ## Frontmatter is preserved
 
-`write-atomic` writes the exact content you pass — it does NOT auto-update `last_updated` / `last_verified` / `last_writer` / `last_agent`. When editing a document that has frontmatter, include the updated frontmatter in your payload. For most hand-off flows, this means loading the current doc, editing the body, re-serialising the whole doc, and passing it back through `write-atomic`.
+`write-atomic` writes the exact content you pass. To have `last_updated` / `last_verified` / `last_writer` / `last_agent` / `session_id` auto-updated, pass `--stamp-frontmatter` (below). Without the flag, the caller is responsible for stamping — load the current doc, edit the body, re-serialise, and pass the whole thing back through `write-atomic`.
+
+### `--stamp-frontmatter` (recommended)
+
+To avoid hand-maintaining timestamps and metadata on every write, pass `--stamp-frontmatter` and let the tool re-write the frontmatter in-place:
+
+```bash
+uv run <SKILL_DIR>/scripts/reconcile.py write-atomic \
+  --filepath "$SCOPE/walkthrough.md" \
+  --content-file /tmp/staged.md \
+  --scope "$SCOPE" \
+  --stamp-frontmatter \
+  --writer hand-off \
+  --agent "$AGENT" \
+  --session-id "$SESSION_ID"
+```
+
+Semantics:
+- `last_updated` and `last_verified` are set to the current UTC ISO-8601 timestamp.
+- `last_writer` / `last_agent` / `session_id` are updated only when the corresponding argument is passed.
+- Other frontmatter keys (`kind`, `version`, `status`, etc.) are preserved verbatim.
+- The payload MUST already contain a YAML frontmatter block — no frontmatter is a hard error (this is a hand-off doc, it must have one).
+
+### `--scope <path>` (recommended safety net)
+
+Pass `--scope $SCOPE` on every `write-atomic` call. When set, `--filepath` must resolve inside `--scope` or the write is refused with `status: error, reason: path_outside_scope` and exit code 4. This closes the "silent write outside the scope" class of bug — see the pitfalls section below for the shell-quoting trap that motivated the flag.
+
+## Windows path pitfalls (git-bash / MSYS)
+
+Bash double quotes process `\\` and `\$` **before** the command sees the string, so a native Windows backslash path combined with a shell variable will silently mis-expand. Every workflow example in this repo assumes forward-slash paths for exactly this reason.
+
+- ❌ `--filepath "$SCOPE\\${f}.md"` → bash collapses `\\${f}` to a literal `${f}` (the `\$` escapes the dollar sign), and the whole thing lands as `<SCOPE>${f}.md` with no separator. `write-atomic` will happily create it — outside your scope.
+- ✅ `--filepath "$SCOPE/${f}.md"` — forward slashes safely mix with vars.
+- ✅ `--filepath "C:/Users/.../$name.md"` — forward slashes work throughout the path.
+- ✅ `--filepath "/c/Users/.../$name.md"` — MSYS style; auto-resolved to `C:\Users\...` by the tool.
+
+If you must use backslashes, use **single quotes** AND no variables:
+
+```bash
+uv run <SKILL_DIR>/scripts/reconcile.py write-atomic \
+  --filepath 'C:\Users\me\project\context.md' \
+  --content-file /tmp/staged.md
+```
+
+Bash makes zero substitutions inside single quotes, so the backslashes reach the Python interpreter intact. As soon as you introduce a `$var` you're back to needing forward slashes or `"…\\…"` double-backslash quoting (which is not worth the cognitive tax).
+
+**Repro against `write-atomic`** (verified 2026-07-22, git-bash on Windows 10):
+
+```bash
+$ SCOPE='C:\some\dir'
+$ f=context
+$ uv run reconcile.py write-atomic \
+    --filepath "$SCOPE\\${f}.md" \
+    --content "hi"
+{"status": "success", "filepath": "C:\\some\\dir${f}.md", "bytes": 2}
+```
+
+The `${f}` reached Python **literally**, unseparated from `dir`, and `write-atomic` created that path outside your scope with no warning. Swap the `\\` for `/` and the same command lands correctly at `C:\some\dir\context.md`.
+
+See also `write-atomic --scope <path>`, which refuses (or warns) when the resolved filepath falls outside the given scope — the runtime safety net for this class of bug.

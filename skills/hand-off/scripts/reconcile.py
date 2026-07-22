@@ -1547,7 +1547,7 @@ def cmd_unlock(args: argparse.Namespace) -> None:
 
 
 def cmd_write_atomic(args: argparse.Namespace) -> None:
-    filepath = resolve_msys_path(args.filepath)
+    filepath = resolve_msys_path(args.filepath).resolve()
     if args.content is not None:
         content = args.content
     elif args.content_file:
@@ -1555,12 +1555,82 @@ def cmd_write_atomic(args: argparse.Namespace) -> None:
         content = cf.read_text(encoding="utf-8")
     else:
         content = sys.stdin.read()
+
+    # ----- Scope boundary check (DECISIONS R32) -----
+    # If --scope is given, --filepath MUST resolve inside it. This closes
+    # the class of bug where an unescaped shell variable (e.g. bash
+    # collapsing "$SCOPE\\${f}.md" to a path with no separator and a
+    # literal ${f}) lets write-atomic clobber files outside the scope.
+    if args.scope:
+        scope_root = resolve_msys_path(args.scope).resolve()
+        try:
+            inside = filepath.is_relative_to(scope_root)
+        except AttributeError:  # pragma: no cover  (Python <3.9)
+            inside = str(filepath).startswith(str(scope_root))
+        if not inside:
+            print(json.dumps({
+                "status": "error",
+                "reason": "path_outside_scope",
+                "filepath": str(filepath),
+                "scope": str(scope_root),
+                "hint": (
+                    "Check for unescaped shell variables or missing "
+                    "separators. On Windows/git-bash prefer forward slashes "
+                    "in paths that also expand variables — see "
+                    "references/atomic-writes.md#windows-path-pitfalls."
+                ),
+            }))
+            sys.exit(4)
+
+    # ----- Frontmatter stamping (DECISIONS R33) -----
+    # Optional --stamp-frontmatter re-writes last_updated / last_verified
+    # (and optionally last_writer / last_agent / session_id) in-place so
+    # callers don't hand-maintain ISO timestamps and metadata on every
+    # hand-off write. Requires the payload to already carry a YAML
+    # frontmatter block — a hand-off doc without one is a caller bug.
+    if args.stamp_frontmatter:
+        try:
+            meta, body = load_frontmatter(content)
+        except ValueError as e:
+            print(json.dumps({
+                "status": "error",
+                "reason": "invalid_frontmatter",
+                "message": str(e),
+            }))
+            sys.exit(5)
+        if not meta:
+            print(json.dumps({
+                "status": "error",
+                "reason": "frontmatter_missing",
+                "hint": (
+                    "--stamp-frontmatter requires the payload to begin with "
+                    "a YAML frontmatter block (--- … ---). This is a hand-off "
+                    "doc — it must have frontmatter."
+                ),
+            }))
+            sys.exit(5)
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        meta["last_updated"] = now
+        meta["last_verified"] = now
+        # --writer values are validated at argparse layer (choices=VALID_WRITERS);
+        # last_agent / session_id are free-form strings.
+        if args.writer:
+            meta["last_writer"] = args.writer
+        if args.agent:
+            meta["last_agent"] = args.agent
+        if args.session_id:
+            meta["session_id"] = args.session_id
+        content = dump_frontmatter(meta, body)
+
     write_atomic(filepath, content)
-    print(json.dumps({
+    payload = {
         "status": "success",
         "filepath": str(filepath),
         "bytes": len(content),
-    }))
+    }
+    if args.stamp_frontmatter:
+        payload["stamped_frontmatter"] = True
+    print(json.dumps(payload))
 
 
 def cmd_list_scopes(args: argparse.Namespace) -> None:
@@ -1709,6 +1779,27 @@ def main() -> None:
                           help="Inline content (avoid for large content)")
     p_write.add_argument("--content-file",
                           help="Read payload from this file (recommended)")
+    p_write.add_argument("--scope",
+                          help=(
+                              "Optional scope root. When set, --filepath must "
+                              "resolve inside this directory or the write is "
+                              "refused (protects against unescaped shell vars "
+                              "silently writing outside the scope)."
+                          ))
+    p_write.add_argument("--stamp-frontmatter", action="store_true",
+                          help=(
+                              "Re-write last_updated / last_verified (to now) "
+                              "and optionally last_writer / last_agent / "
+                              "session_id in the payload's YAML frontmatter "
+                              "before atomic write."
+                          ))
+    p_write.add_argument("--writer",
+                          choices=sorted(VALID_WRITERS),
+                          help="With --stamp-frontmatter: set last_writer.")
+    p_write.add_argument("--agent",
+                          help="With --stamp-frontmatter: set last_agent.")
+    p_write.add_argument("--session-id",
+                          help="With --stamp-frontmatter: set session_id.")
     p_write.set_defaults(func=cmd_write_atomic)
 
     p_list = sub.add_parser("list-scopes",

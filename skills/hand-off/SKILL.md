@@ -61,6 +61,12 @@ uv run "$SKILL_DIR/scripts/reconcile.py" prepare --scope "$SCOPE" \
 #   walkthrough.md  ← append `## YYYY-MM-DD — <slug>` entry
 #   questions.md    ← updates to Open / Closed sections
 #   context.md      ← new invariants, each with a provenance tag
+#
+# Pass --scope "$SCOPE" on every write-atomic call — refuses out-of-scope
+# writes so a shell-quoting slip can't clobber files outside the scope.
+# Add --stamp-frontmatter --writer hand-off --agent "$AGENT" \
+#     --session-id "$SESSION_ID" to auto-update last_updated / last_verified /
+# last_writer / last_agent / session_id instead of hand-maintaining them.
 
 # Step 3: apply cleanup
 uv run "$SKILL_DIR/scripts/reconcile.py" clean-up --scope "$SCOPE" \
@@ -70,6 +76,8 @@ uv run "$SKILL_DIR/scripts/reconcile.py" clean-up --scope "$SCOPE" \
 ```
 
 If Step 1's `next_action` is anything other than `safe_to_apply`, open `references/next-actions.md` and follow the contract for that branch. This isn't a place to improvise — the branches encode conflict-handling that took real hallucination pain to figure out.
+
+> **Windows / git-bash note.** All examples use forward slashes even when pointing at Windows paths (`C:/Users/...` not `C:\Users\...`). Backslashes combine badly with `$var` inside bash double quotes and can silently write files outside the scope. See `references/atomic-writes.md#windows-path-pitfalls` for the trap and how `--scope` on `write-atomic` guards against it.
 
 ## Prerequisites
 
