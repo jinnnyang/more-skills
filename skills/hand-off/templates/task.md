@@ -4,7 +4,7 @@ version: 1
 last_updated: {{TIMESTAMP}}
 last_verified: {{TIMESTAMP}}
 last_agent: {{AGENT}}
-last_writer: migration
+last_writer: {{WRITER}}
 session_id: {{SESSION_ID}}
 status: in-progress
 ---
