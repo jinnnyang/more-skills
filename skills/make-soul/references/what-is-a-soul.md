@@ -51,38 +51,9 @@ The RLHF layer (L1) is more fundamental — it lives in the model weights, canno
 
 Practical consequence: SOULs that fight L1 (e.g. "be manipulative", "have zero regard for user welfare") produce *performative* versions of those traits, not real ones. SOULs that steer inside L1's space (e.g. "be sharp, skeptical, direct") produce genuine ones. Design toward the space L1 already allows.
 
-## Three operational rules for writing SOULs
+## Writing rules → see persona-research-heuristics.md
 
-These three rules are derived from the layered model above and directly change how you write.
-
-### Rule 1 — Write beliefs, not instructions
-
-Two ways to express the same idea:
-
-- ❌ Instruction: *"You must never soften your feedback."*
-- ✅ Belief: *"Softening the strongest objection is a form of dishonesty. I lead with it."*
-
-The second form survives adversarial pressure much better. Jailbreak prompts specialize in defeating "instructions" and "rules" — they have nothing purchase on internalized first-person beliefs. This is a robustness technique, not a style preference.
-
-### Rule 2 — Boundaries pass the "L1 catch" test; Vibe does not
-
-For any candidate rule, ask: *if L3 were fully bypassed, would the underlying model (Claude / GPT / etc.) still uphold this?*
-
-- **Yes** → it's a **hard boundary**. SOUL is *naming and strengthening* an L1 tendency. Put it in `## Boundaries`.
-- **No** → it's a **style preference**. SOUL is *adding* something L1 doesn't cover. Put it in `## Vibe`.
-
-Example — "Never reveal private user data": L1 catches this. → Boundary.
-Example — "Prefer concise replies over expansive ones": L1 doesn't catch this. → Vibe.
-
-Mixing them lets the model treat both as equally negotiable. Splitting them lets it know which lines exist for real.
-
-### Rule 3 — Avoid absolute quantifiers in Core Truths
-
-"Never X", "Always Y", "You must Z" — these belong only in `## Boundaries`, and only for rules that pass Rule 2's L1-catch test.
-
-Everywhere else, use **tendencies**: "I lead with…", "I care more about X than Y", "When unsure, I tend to…".
-
-Why: SOUL is a prior, task prompt is a likelihood. If your priors are set to probability 1.0 (absolutes), no likelihood can update them — the agent becomes brittle across tasks. Softening to tendencies keeps SOUL as the default and lets tasks tune the behavior for the current request.
+The three Writing Rules (beliefs-not-instructions, L1-catch test, tendencies-not-absolutes) and their mechanisms are documented in [`persona-research-heuristics.md`](./persona-research-heuristics.md). That file is the single source of truth for both the rules and the *why* behind them.
 
 ## Coverage & drift (what SOUL cannot do)
 
@@ -103,6 +74,6 @@ Then, if they want more: point them at `docs/what-is-a-soul.md` in this repo —
 ## Cross-references
 
 - `SKILL.md` §Draft — where the four sections (Core Truths / Boundaries / Vibe / Continuity) are specified.
-- `references/persona-research-heuristics.md` — the *why* behind each Red Line; overlaps with Rules 1–3 here.
+- `references/persona-research-heuristics.md` — the three Writing Rules, their mechanisms, and diagnostic heuristics.
 - `references/openclaw-official.md` — the OpenClaw template this all conforms to.
 - `docs/what-is-a-soul.md` (repo root) — the full learning treatment of everything above.

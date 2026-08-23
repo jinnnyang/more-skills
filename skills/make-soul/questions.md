@@ -6,7 +6,7 @@ last_verified: 2026-07-20 02:58:15+00:00
 last_agent: Hermes Agent (ark-code-latest)
 last_writer: hand-off
 session_id: sess-20260720-make-soul-corpus-opt
-status: phase-complete
+status: done
 ---
 
 # Questions

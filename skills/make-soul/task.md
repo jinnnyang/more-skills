@@ -60,12 +60,14 @@ Extracted SOUL portions from the leaked-system-prompts corpus (`asgeirtj/system_
 
 ## Now
 
-- None. Both optimization passes complete and committed. Session handed off.
+- `[x]` **P0** Slim SKILL.md 161→100 lines ✅
+- `[x]` **P1** De-dup writing rules: what-is-a-soul.md → persona-research-heuristics.md (108→79 lines) ✅
+- `[x]` **P3** Clean stale metadata: context.md status→done, questions.md status→done, reference count updated ✅
 
 ## Next
 
-- `[ ]` Optional dogfood: write a fresh SOUL.md using the upgraded skill on a real agent use-case. Verify Writing Rule 4 (named failure modes) actually shows up in the draft.
-- `[ ]` Optional corpus expansion: add 1–2 more positive examples (e.g. Perplexity's tone block, OpenAI personality presets) to broaden coverage. Diminishing returns after ~5 total, but worth doing before the corpus snapshot goes stale.
+- `[ ]` **P2** Dogfood: write a fresh SOUL.md using the upgraded skill. Verify Writing Rule 4 shows up in the draft.
+- `[ ]` Optional corpus expansion: add 1–2 good examples.
 
 ## Blocked
 

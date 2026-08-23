@@ -6,7 +6,7 @@ last_verified: 2026-07-20T03:15:00+00:00
 last_agent: Hermes Agent (ark-code-latest)
 last_writer: take-over
 session_id: sess-20260720-make-soul-refactor
-status: in-progress
+status: done
 ---
 
 # Project Invariants & Context
@@ -33,9 +33,9 @@ Selected direction after diagnostic pass on the copied files:
 5. **Discovery Patterns A/B/C** merge into a single "Discover" step; the three patterns become branches inside that step, not siblings.
 6. **Writing Rules ∪ Anti-Patterns**: consolidate into ONE red-line list in `SKILL.md`; move the elaborated rationale to `references/persona-research-heuristics.md`.
 7. **New reference**: `references/deliverable-format.md` — canonical output shape (rationale block, fenced SOUL.md body, optional IDENTITY.md, 3 test prompts).
-8. **Reference count** after refactor: 4 files (was 3).
-9. **Read-before-drafting gating**: consolidate into ONE table near the top of `SKILL.md`; remove the duplicated Reference Map at the bottom.
-10. **Target size**: `SKILL.md` ≈ 100 lines (from 192); each reference ≤ 90 lines.
+8. **Reference count** after refactor: 5 files (was 3): `what-is-a-soul.md`, `persona-research-heuristics.md`, `openclaw-official.md`, `deliverable-format.md`, `souls-directory-publishing.md`.
+9. **Read-before-drafting gating**: consolidated into ONE table at the top of `SKILL.md` ✅.
+10. **Target size**: `SKILL.md` = 100 lines (from 192) ✅. `what-is-a-soul.md` = 79 lines (de-duped writing rules to `persona-research-heuristics.md`).
 
 ## Invariants & Rules
 
