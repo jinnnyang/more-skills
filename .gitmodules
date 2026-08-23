@@ -1,0 +1,3 @@
+[submodule "skills/code-review"]
+	path = skills/code-review
+	url = https://github.com/jinnnyang/code-review.git
